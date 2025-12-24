@@ -24,3 +24,5 @@ tinkex_cookbook-*.tar
 /inspect_ai/
 /tinker-cookbook/
 /priv/plts/
+/nx/
+/numpy/

@@ -35,10 +35,14 @@ defmodule TinkexCookbook.Datasets.NoRobots do
   """
 
   alias TinkexCookbook.Renderers.{Renderer, TrainOnWhat, Types}
-  alias TinkexCookbook.Supervised.{Common, SupervisedDatasetFromList}
+  alias TinkexCookbook.Supervised.{Common, SupervisedDatasetFromSamples}
   alias TinkexCookbook.Types.Datum
+  alias TinkexCookbook.Utils.Parity
 
   @dataset_name "HuggingFaceH4/no_robots"
+
+  # Agent for tracking rendered sample count in parity mode
+  @rendered_sample_counter __MODULE__.RenderedSampleCounter
 
   @doc """
   Loads the NoRobots dataset from HuggingFace.
@@ -57,13 +61,16 @@ defmodule TinkexCookbook.Datasets.NoRobots do
   def load(opts \\ []) do
     split = Keyword.get(opts, :split, "train")
     limit = Keyword.get(opts, :limit)
+    shuffle_seed = Keyword.get(opts, :shuffle_seed)
 
     case HfDatasetsEx.load_dataset(@dataset_name, split: split) do
       {:ok, dataset} ->
+        # Use hf_datasets_ex's shuffle if seed provided
+        dataset = maybe_shuffle_dataset(dataset, shuffle_seed)
+
         samples =
-          dataset
+          dataset.items
           |> maybe_limit(limit)
-          |> Enum.to_list()
 
         {:ok, samples}
 
@@ -117,6 +124,10 @@ defmodule TinkexCookbook.Datasets.NoRobots do
         renderer_state
       )
 
+    # Log rendered sample for parity comparison (if PARITY_MODE=1, first 10 samples)
+    sample_index = get_and_increment_rendered_sample_count()
+    maybe_log_rendered_sample(sample_index, sample, model_input, weights)
+
     # Use the common function that handles right-shift/left-shift
     Common.datum_from_model_input_weights(model_input, weights, max_length)
   end
@@ -147,8 +158,12 @@ defmodule TinkexCookbook.Datasets.NoRobots do
   @doc """
   Creates a SupervisedDataset from a list of samples.
 
-  This is a convenience function that builds datums and wraps them
-  in a SupervisedDatasetFromList.
+  Uses lazy datum building to match Python's `SupervisedDatasetFromHFDataset` behavior:
+  - Stores samples (not datums)
+  - Shuffles samples on `set_epoch/2` using HfDatasetsEx (PCG64-based)
+  - Builds datums lazily during `get_batch/2`
+
+  This ensures parity with Python's training loop.
 
   ## Options
 
@@ -160,9 +175,9 @@ defmodule TinkexCookbook.Datasets.NoRobots do
 
   ## Returns
 
-  A SupervisedDatasetFromList struct.
+  A SupervisedDatasetFromSamples struct.
   """
-  @spec create_supervised_dataset([map()], keyword()) :: SupervisedDatasetFromList.t()
+  @spec create_supervised_dataset([map()], keyword()) :: SupervisedDatasetFromSamples.t()
   def create_supervised_dataset(samples, opts) do
     renderer_module = Keyword.fetch!(opts, :renderer_module)
     renderer_state = Keyword.fetch!(opts, :renderer_state)
@@ -170,13 +185,64 @@ defmodule TinkexCookbook.Datasets.NoRobots do
     batch_size = Keyword.get(opts, :batch_size, 32)
     max_length = Keyword.get(opts, :max_length)
 
-    datums = build_datums(samples, renderer_module, renderer_state, train_on_what, max_length)
+    # Log dataset snapshot for parity comparison (if PARITY_MODE=1)
+    Parity.log_dataset_snapshot(samples, 10)
 
-    SupervisedDatasetFromList.new(datums, batch_size)
+    # Start rendered sample counter for parity mode (will be used during lazy datum building)
+    start_rendered_sample_counter()
+
+    # Create datum builder function for lazy evaluation
+    # This matches Python's map_fn that's called during get_batch
+    datum_builder = fn sample ->
+      build_datum(sample, renderer_module, renderer_state, train_on_what, max_length)
+    end
+
+    SupervisedDatasetFromSamples.new(samples, batch_size, datum_builder)
   end
 
   # Private helpers
 
   defp maybe_limit(dataset, nil), do: dataset
   defp maybe_limit(dataset, limit) when is_integer(limit), do: Enum.take(dataset, limit)
+
+  defp maybe_shuffle_dataset(dataset, nil), do: dataset
+
+  defp maybe_shuffle_dataset(dataset, seed) when is_integer(seed) do
+    HfDatasetsEx.Dataset.shuffle(dataset, seed: seed)
+  end
+
+  # Parity mode helpers
+
+  @doc false
+  def start_rendered_sample_counter do
+    if Parity.parity_mode?() do
+      Agent.start_link(fn -> 0 end, name: @rendered_sample_counter)
+    end
+  end
+
+  @doc false
+  def stop_rendered_sample_counter do
+    if Process.whereis(@rendered_sample_counter) do
+      Agent.stop(@rendered_sample_counter)
+    end
+  end
+
+  defp get_and_increment_rendered_sample_count do
+    if Process.whereis(@rendered_sample_counter) do
+      Agent.get_and_update(@rendered_sample_counter, fn count -> {count, count + 1} end)
+    else
+      nil
+    end
+  end
+
+  defp maybe_log_rendered_sample(sample_index, sample, model_input, weights) do
+    if Parity.parity_mode?() && sample_index != nil && sample_index < 10 do
+      messages =
+        sample
+        |> sample_to_messages()
+        |> Enum.map(fn msg -> %{role: msg.role, content: msg.content} end)
+
+      Parity.log_rendered_sample(sample_index, messages, model_input, weights)
+    end
+  end
 end

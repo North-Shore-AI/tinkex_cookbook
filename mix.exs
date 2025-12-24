@@ -57,7 +57,7 @@ defmodule TinkexCookbook.MixProject do
   defp deps do
     [
       # HuggingFace ecosystem (maps to Python datasets + huggingface_hub)
-      {:hf_datasets_ex, "~> 0.1"},
+      {:hf_datasets_ex, "~> 0.1.1"},
       {:hf_hub, "~> 0.1"},
 
       # Google Gemini API (maps to Python google-genai)

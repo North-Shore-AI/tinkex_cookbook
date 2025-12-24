@@ -112,3 +112,98 @@ defmodule TinkexCookbook.Supervised.SupervisedDatasetFromList do
     %{dataset | shuffled_data: shuffled}
   end
 end
+
+defmodule TinkexCookbook.Supervised.SupervisedDatasetFromSamples do
+  @moduledoc """
+  A supervised dataset that stores samples and builds datums lazily.
+
+  This implementation matches Python's `SupervisedDatasetFromHFDataset` behavior:
+  - Stores samples (not datums)
+  - Shuffles samples on `set_epoch/2` using HfDatasetsEx (PCG64-based, same as Python)
+  - Builds datums lazily during `get_batch/2`
+
+  This ensures parity with Python's training loop where datums are built
+  after epoch shuffling, not before.
+  """
+
+  @behaviour TinkexCookbook.Supervised.SupervisedDataset
+
+  alias TinkexCookbook.Types.Datum
+
+  @type datum_builder :: (map() -> Datum.t())
+
+  @type t :: %__MODULE__{
+          samples: [map()],
+          shuffled_samples: [map()] | nil,
+          batch_size: pos_integer(),
+          datum_builder: datum_builder()
+        }
+
+  @enforce_keys [:samples, :batch_size, :datum_builder]
+  defstruct [:samples, :shuffled_samples, :batch_size, :datum_builder]
+
+  @doc """
+  Creates a new dataset from a list of samples and a datum builder function.
+
+  The datum_builder function is called lazily during `get_batch/2` to convert
+  samples to datums. This matches Python's behavior where `map_fn` is called
+  during batch retrieval, not dataset construction.
+
+  ## Arguments
+
+  - `samples` - List of sample maps (e.g., from HuggingFace dataset)
+  - `batch_size` - Number of samples per batch
+  - `datum_builder` - Function that converts a sample map to a Datum
+
+  ## Example
+
+      dataset = SupervisedDatasetFromSamples.new(
+        samples,
+        batch_size: 32,
+        datum_builder: fn sample ->
+          NoRobots.build_datum(sample, renderer_module, renderer_state, train_on_what)
+        end
+      )
+  """
+  @spec new([map()], pos_integer(), datum_builder()) :: t()
+  def new(samples, batch_size, datum_builder)
+      when is_list(samples) and batch_size > 0 and is_function(datum_builder, 1) do
+    %__MODULE__{
+      samples: samples,
+      shuffled_samples: nil,
+      batch_size: batch_size,
+      datum_builder: datum_builder
+    }
+  end
+
+  @impl true
+  @spec get_batch(t(), non_neg_integer()) :: [Datum.t()]
+  def get_batch(
+        %__MODULE__{batch_size: batch_size, datum_builder: datum_builder} = dataset,
+        index
+      ) do
+    samples = dataset.shuffled_samples || dataset.samples
+    start = index * batch_size
+
+    samples
+    |> Enum.slice(start, batch_size)
+    |> Enum.map(datum_builder)
+  end
+
+  @impl true
+  @spec length(t()) :: non_neg_integer()
+  def length(%__MODULE__{samples: samples, batch_size: batch_size}) do
+    div(Enum.count(samples), batch_size)
+  end
+
+  @impl true
+  @spec set_epoch(t(), non_neg_integer()) :: t()
+  def set_epoch(%__MODULE__{samples: samples} = dataset, seed) do
+    # Use PCG64 PRNG directly (same algorithm as Python's numpy.random.Generator)
+    # This ensures identical shuffle order to Python's datasets.Dataset.shuffle
+    prng_state = HfDatasetsEx.PRNG.PCG64.seed(seed)
+    {shuffled, _final_state} = HfDatasetsEx.PRNG.PCG64.shuffle(samples, prng_state)
+
+    %{dataset | shuffled_samples: shuffled}
+  end
+end

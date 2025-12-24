@@ -42,15 +42,31 @@ end
 ### Running sl_basic Recipe
 
 ```bash
-# From command line
-mix run -e "TinkexCookbook.Recipes.SlBasic.main()"
+# Set your API key
+export TINKER_API_KEY=your_key_here
 
-# With custom args
-mix run -e "TinkexCookbook.Recipes.SlBasic.main()" -- \
-  log_path=/tmp/my_run \
-  learning_rate=0.0002 \
-  num_epochs=2
+# Basic run with defaults
+mix sl_basic
+
+# With custom options
+mix sl_basic log_path=/tmp/my_run learning_rate=0.0002 num_epochs=2
+
+# Limit samples for quick testing
+mix sl_basic n_train_samples=100 batch_size=32
+
+# See all available options
+mix help sl_basic
 ```
+
+Available options:
+- `log_path` - Output directory (default: `/tmp/tinkex-examples/sl_basic`)
+- `model_name` - Model to fine-tune (default: `meta-llama/Llama-3.1-8B`)
+- `learning_rate` - Learning rate (default: `0.0002`)
+- `num_epochs` - Training epochs (default: `1`)
+- `batch_size` - Batch size (default: `128`)
+- `max_length` - Max sequence length (default: `32768`)
+- `lora_rank` - LoRA rank (default: `32`)
+- `n_train_samples` - Limit training samples (default: all)
 
 ### Programmatic Usage
 

@@ -32,7 +32,8 @@ defmodule TinkexCookbook.Recipes.SlBasic do
     SupervisedDataset
   }
 
-  alias TinkexCookbook.Utils.{CliUtils, MlLog}
+  alias TinkexCookbook.Types.{Datum, ModelInput}
+  alias TinkexCookbook.Utils.{CliUtils, MlLog, Parity}
 
   # CliConfig is defined in sl_basic_config.ex to work around ChzEx macro issues
   alias __MODULE__.CliConfig
@@ -152,6 +153,9 @@ defmodule TinkexCookbook.Recipes.SlBasic do
     # Setup logging
     ml_logger = MlLog.setup_logging(config.log_path, config: config)
 
+    # Initialize parity logger for artifact comparison (if PARITY_MODE=1)
+    Parity.init_logger(config.log_path)
+
     # Get API key
     api_key = System.get_env("TINKER_API_KEY")
 
@@ -161,6 +165,10 @@ defmodule TinkexCookbook.Recipes.SlBasic do
 
       # Close logger
       MlLog.close(ml_logger)
+
+      # Flush and stop parity logger
+      Parity.flush_logger()
+      Parity.stop_logger()
 
       result
     else
@@ -245,11 +253,12 @@ defmodule TinkexCookbook.Recipes.SlBasic do
 
     Logger.info("Loading NoRobots dataset...")
 
+    # Match Python's shuffle(seed=0) behavior
     load_opts =
       if n_train_samples do
-        [split: "train", limit: n_train_samples]
+        [split: "train", shuffle_seed: 0, limit: n_train_samples]
       else
-        [split: "train"]
+        [split: "train", shuffle_seed: 0]
       end
 
     case NoRobots.load(load_opts) do
@@ -287,9 +296,12 @@ defmodule TinkexCookbook.Recipes.SlBasic do
   # The tokenizer handle is a Tokenizers.Tokenizer.t() (NIF-backed)
   defp create_tokenizer_wrapper(tokenizer_handle) do
     %{
-      encode: fn text, _opts ->
-        # Use Tokenizers NIF directly
-        case Tokenizers.Tokenizer.encode(tokenizer_handle, text) do
+      encode: fn text, opts ->
+        # Pass add_special_tokens option to match Python behavior
+        # Python renderers use add_special_tokens=False to prevent duplicate BOS tokens
+        add_special = Keyword.get(opts, :add_special_tokens, true)
+
+        case Tokenizers.Tokenizer.encode(tokenizer_handle, text, add_special_tokens: add_special) do
           {:ok, encoding} -> Tokenizers.Encoding.get_ids(encoding)
           {:error, _} -> []
         end
@@ -373,6 +385,11 @@ defmodule TinkexCookbook.Recipes.SlBasic do
       # Get batch
       batch = SupervisedDataset.get_batch(dataset, batch_idx)
 
+      # Log first batch for parity comparison (if PARITY_MODE=1)
+      if global_step == 0 do
+        Parity.log_first_batch_payload(batch)
+      end
+
       # Convert our Datum structs to Tinkex format
       tinkex_data = Enum.map(batch, &datum_to_tinkex/1)
 
@@ -400,13 +417,15 @@ defmodule TinkexCookbook.Recipes.SlBasic do
         current_step: current_step
       }
 
-      process_training_step(training_client, tinkex_data, adam_params, step_context)
+      process_training_step(training_client, tinkex_data, batch, adam_params, step_context)
     end)
   end
 
-  defp process_training_step(training_client, tinkex_data, adam_params, ctx) do
+  defp process_training_step(training_client, tinkex_data, batch, adam_params, ctx) do
     case training_step(training_client, tinkex_data, adam_params) do
-      {:ok, metrics} ->
+      {:ok, fb_output} ->
+        # Compute metrics matching Python's tinker_cookbook
+        metrics = compute_training_metrics(fb_output, batch)
         handle_step_success(metrics, ctx)
 
       {:error, reason} ->
@@ -464,7 +483,8 @@ defmodule TinkexCookbook.Recipes.SlBasic do
 
         case Task.await(optim_task, :infinity) do
           {:ok, _optim_output} ->
-            {:ok, fb_output.metrics || %{}}
+            # Return full fb_output for metrics computation
+            {:ok, fb_output}
 
           {:error, reason} ->
             {:error, {:optim_step_failed, reason}}
@@ -472,6 +492,75 @@ defmodule TinkexCookbook.Recipes.SlBasic do
 
       {:error, reason} ->
         {:error, {:forward_backward_failed, reason}}
+    end
+  end
+
+  # Compute training metrics matching Python's tinker_cookbook/supervised/train.py
+  # This provides full parity with the Python implementation's metrics logging.
+  defp compute_training_metrics(fb_output, batch) do
+    # Extract logprobs from loss_fn_outputs (one per datum)
+    logprobs_list =
+      Enum.map(fb_output.loss_fn_outputs || [], fn output ->
+        case output do
+          %{"logprobs" => %{"data" => data}} -> data
+          %{"logprobs" => data} when is_list(data) -> data
+          _ -> []
+        end
+      end)
+
+    # Extract weights from each datum in the batch
+    weights_list =
+      Enum.map(batch, fn datum ->
+        case Datum.get_weights(datum) do
+          nil -> []
+          weights -> weights.data
+        end
+      end)
+
+    # Compute weighted mean NLL (matching Python's compute_mean_nll)
+    train_mean_nll = compute_mean_nll(logprobs_list, weights_list)
+
+    # Compute other metrics matching Python
+    num_sequences = length(batch)
+
+    num_tokens =
+      Enum.reduce(batch, 0, fn datum, acc ->
+        acc + ModelInput.length(datum.model_input)
+      end)
+
+    num_loss_tokens =
+      Enum.reduce(batch, 0.0, fn datum, acc ->
+        acc + Datum.num_loss_tokens(datum)
+      end)
+
+    %{
+      "num_sequences" => num_sequences,
+      "num_tokens" => num_tokens,
+      "num_loss_tokens" => num_loss_tokens,
+      "train_mean_nll" => train_mean_nll
+    }
+  end
+
+  # Compute weighted mean negative log likelihood.
+  # Matches Python's tinker_cookbook/supervised/common.py compute_mean_nll
+  defp compute_mean_nll(logprobs_list, weights_list) do
+    {total_weighted_logprobs, total_weights} =
+      Enum.zip(logprobs_list, weights_list)
+      |> Enum.reduce({0.0, 0.0}, fn {logprobs, weights}, {acc_logprobs, acc_weights} ->
+        # Dot product: sum(logprobs * weights)
+        weighted_sum =
+          Enum.zip(logprobs, weights)
+          |> Enum.reduce(0.0, fn {lp, w}, acc -> acc + lp * w end)
+
+        weight_sum = Enum.sum(weights)
+        {acc_logprobs + weighted_sum, acc_weights + weight_sum}
+      end)
+
+    if total_weights == 0 do
+      # Return NaN for no valid weights (matching Python behavior)
+      :nan
+    else
+      -total_weighted_logprobs / total_weights
     end
   end
 

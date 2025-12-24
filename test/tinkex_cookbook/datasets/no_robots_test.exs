@@ -200,7 +200,7 @@ defmodule TinkexCookbook.Datasets.NoRobotsTest do
           batch_size: 2
         )
 
-      assert %TinkexCookbook.Supervised.SupervisedDatasetFromList{} = dataset
+      assert %TinkexCookbook.Supervised.SupervisedDatasetFromSamples{} = dataset
     end
 
     test "dataset has correct number of batches", %{state: state, samples: samples} do
