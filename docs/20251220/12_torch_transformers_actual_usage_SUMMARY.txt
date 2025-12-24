@@ -1,0 +1,123 @@
+TORCH & TRANSFORMERS USAGE ANALYSIS - EXECUTIVE SUMMARY
+========================================================
+
+Date: 2025-12-20
+Full Report: 12_torch_transformers_actual_usage.md
+
+KEY FINDINGS
+============
+
+1. TINKER-COOKBOOK IS A CLIENT LIBRARY
+   - Calls Tinker API for all training (backprop, optimizers, model weights)
+   - torch/transformers used ONLY for data preparation, NOT model training
+   - Architecture: Client (cookbook) ↔ HTTP/REST ↔ Server (Tinker API)
+
+2. TRANSFORMERS USAGE: 100% REPLACEABLE
+   Files: 3 files (tokenizer_utils.py, hyperparam_utils.py, tests)
+   Usage: AutoTokenizer.from_pretrained(), AutoConfig.from_pretrained()
+   
+   Elixir Equivalent:
+   - AutoTokenizer → Already have {:tokenizers, "~> 0.5"} in tinkex
+   - AutoConfig → Can hardcode or HTTP fetch config.json (low priority)
+   
+   Verdict: ✅ NO transformers library needed
+
+3. TORCH USAGE: SIMPLE NX OPERATIONS
+   Files: 12 files (supervised, preference, rl, renderers, tests)
+   
+   Operations Used:
+   - torch.tensor([...])           → Nx.tensor([...])
+   - torch.cat([t1, t2])          → Nx.concatenate([t1, t2])
+   - torch.stack([t1, t2])        → Nx.stack([t1, t2])
+   - tensor.dot(other)            → Nx.dot(tensor, other)
+   - tensor.sum() / .mean()       → Nx.sum() / Nx.mean()
+   - torch.full((n,), val)        → Nx.broadcast(val, {n})
+   - torch.log() / .sigmoid()     → Nx.log() / Nx.sigmoid()
+   
+   NOT Used:
+   ❌ torch.nn (neural networks)
+   ❌ torch.optim (optimizers)
+   ❌ torch.autograd (gradients)
+   ❌ model.forward() (inference)
+   ❌ loss.backward() (backprop)
+   
+   Verdict: ✅ Nx handles all cases trivially
+
+4. CRITICAL MISSING PIECE: TensorData Bridge
+   
+   Python:
+   - tinker.TensorData.from_torch(torch_tensor) → JSON payload
+   - api_response.to_torch() → torch_tensor
+   
+   Needed in Elixir:
+   - Tinkex.TensorData.from_nx(nx_tensor) → map for JSON
+   - Tinkex.TensorData.to_nx(response_map) → Nx.tensor
+   
+   Complexity: Low (1-2 days)
+
+DEPENDENCIES NEEDED
+===================
+
+tinkex (base library):
+  {:nx, "~> 0.9"}           # NEW - tensor operations
+  {:tokenizers, "~> 0.5"}   # Already have
+  {:req, "~> 0.5"}          # Already have
+  {:jason, "~> 1.4"}        # Already have
+
+tinkex_cookbook (recipes):
+  {:tinkex, path: "../tinkex"}  # Inherits Nx from tinkex
+  
+NO PYTHON DEPENDENCIES NEEDED.
+
+IMPLEMENTATION PLAN
+===================
+
+Phase 1: Core Infrastructure (tinkex)
+  [ ] Implement Tinkex.TensorData.from_nx/1
+  [ ] Implement Tinkex.TensorData.to_nx/1
+  [ ] Add Nx dependency to mix.exs
+  Effort: 1-2 days
+
+Phase 2: Renderers (tinkex_cookbook)
+  [ ] Port RoleColonRenderer
+  [ ] Port Llama3Renderer
+  [ ] Port Qwen3Renderer (3 variants)
+  [ ] Port DeepSeekV3Renderer (2 variants)
+  [ ] Port GptOssRenderer
+  Effort: 3-5 days
+
+Phase 3: Training Orchestration (tinkex_cookbook)
+  [ ] Port supervised/train.py logic
+  [ ] Port supervised/common.py helpers
+  [ ] Port preference/train_dpo.py
+  Effort: 5-7 days
+
+Phase 4: RL Support (tinkex_cookbook)
+  [ ] Port rl/data_processing.py
+  [ ] Port rl/metrics.py
+  [ ] Port rl/train.py orchestration
+  Effort: 3-5 days
+
+Total Estimate: 2-3 weeks for full feature parity
+
+CONCLUSION
+==========
+
+Q: Do we need ANY torch/transformers wrapping at all?
+
+A: NO.
+
+- Tokenization: Already solved (Tokenizers library)
+- Tensor ops: Nx is a drop-in replacement
+- Training: Happens server-side via API
+
+What we DO need:
+1. Nx dependency (trivial)
+2. TensorData bridge module (1-2 days)
+3. Port workflow orchestration logic (2-3 weeks)
+
+The cookbook is pure business logic + API calls.
+No ML framework porting required.
+
+This invalidates 08_torch_transformers_axon_mapping.md which incorrectly
+assumed we were porting PyTorch model training code.
