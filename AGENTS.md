@@ -1,6 +1,6 @@
 # Tinkex Cookbook Agent Guide
 
-**Updated:** 2025-12-23
+**Updated:** 2025-12-24
 
 This repo's core plumbing is built on these libraries:
 - **ChzEx** - Configuration + CLI
@@ -10,8 +10,8 @@ This repo's core plumbing is built on these libraries:
 
 Use this guide to stay consistent when porting the Python tinker-cookbook into Elixir.
 
-> **Phase 1 Completion:** See `docs/20251223/PHASE1_COMPLETION_AGENT_PROMPT.md` for detailed
-> instructions on completing the remaining Phase 1 work.
+> **Phase 1:** Complete. See `docs/20251221/PHASE1_FOUNDATION_SLICE.md` for original scope.
+> **Phase 2:** Next. See `docs/20251221/PHASE2_LIBS_AND_HALF_RECIPES.md` for ~8 additional recipes.
 
 ---
 
@@ -148,9 +148,16 @@ All core plumbing must be TDD:
 
 ---
 
-## Phase 1 Status: COMPLETE
+## Phase 1 Status: COMPLETE + PARITY VERIFIED
 
-Phase 1 delivers a working `sl_basic` recipe in Elixir with full test coverage.
+Phase 1 delivers a working `sl_basic` recipe in Elixir with full test coverage and
+**verified parity** with Python `tinker-cookbook`.
+
+**Run the recipe:**
+```bash
+mix sl_basic --help
+mix sl_basic --model meta-llama/Llama-3.1-8B --num_samples 100
+```
 
 **Completed Components:**
 
@@ -164,14 +171,21 @@ Phase 1 delivers a working `sl_basic` recipe in Elixir with full test coverage.
 | CLI utilities | `lib/tinkex_cookbook/utils/*.ex` | 18 tests |
 | NoRobots dataset | `lib/tinkex_cookbook/datasets/no_robots.ex` | 10 tests |
 | Supervised training | `lib/tinkex_cookbook/supervised/train.ex` | 12 tests |
+| SupervisedDatasetFromSamples | `lib/tinkex_cookbook/supervised/dataset.ex` | 10 tests |
 | TinkexGenerate adapter | `lib/tinkex_cookbook/eval/tinkex_generate.ex` | 6 tests |
 | Eval Runner | `lib/tinkex_cookbook/eval/runner.ex` | 11 tests |
+| Mix task (sl_basic) | `lib/mix/tasks/sl_basic.ex` | - |
 
 **Quality Gates:**
-- 165 tests passing
+- 174 tests passing
 - Zero compiler warnings
 - Credo strict: no issues
 - Dialyzer: no type errors
+
+**Parity Verification (2025-12-24):**
+- Token-level parity: 100% match on all datums (tested with seed 42)
+- Metrics parity: `train_mean_nll`, `num_sequences`, `num_tokens`, `num_loss_tokens` all match
+- Step 0 loss verified identical to 6+ decimal places
 
 ---
 
@@ -199,9 +213,18 @@ Key callbacks:
 The NoRobots dataset builder (`lib/tinkex_cookbook/datasets/no_robots.ex`) provides:
 - `load/1` - Load dataset from HuggingFace
 - `sample_to_messages/1` - Extract messages from samples
-- `build_datum/4` - Convert sample to training Datum
+- `build_datum/5` - Convert sample to training Datum
 - `build_datums/4` - Batch conversion
-- `create_supervised_dataset/2` - Create SupervisedDataset
+- `create_supervised_dataset/2` - Create SupervisedDatasetFromSamples (lazy datum building)
+
+### SupervisedDatasetFromSamples
+
+The `SupervisedDatasetFromSamples` module (`lib/tinkex_cookbook/supervised/dataset.ex`) provides
+Python-parity lazy datum building:
+- Stores raw samples (not pre-built datums)
+- Shuffles samples using PCG64 PRNG (same algorithm as Python numpy.random.Generator)
+- Builds datums lazily during `get_batch/2`
+- Ensures identical batch ordering to Python's `SupervisedDatasetFromHFDataset`
 
 ### Training Module
 
@@ -212,6 +235,10 @@ The training module (`lib/tinkex_cookbook/supervised/train.ex`) provides:
 - `compute_lr/4` - Learning rate scheduling (linear, constant, cosine)
 - `run_epoch/4` - Run single training epoch
 - `run/3` - Full training loop
+
+The `sl_basic` recipe (`lib/tinkex_cookbook/recipes/sl_basic.ex`) includes metrics computation:
+- `compute_training_metrics/2` - Compute num_sequences, num_tokens, num_loss_tokens, train_mean_nll
+- `compute_mean_nll/2` - Calculate mean NLL from logprobs and weights (matches Python exactly)
 
 ### TinkexGenerate Adapter
 
@@ -230,6 +257,20 @@ The evaluation runner (`lib/tinkex_cookbook/eval/runner.ex`) provides:
 - `score_results/2` - Score with exact_match/contains
 - `compute_metrics/1` - Compute accuracy metrics
 - `run_task/2` - Run EvalEx task
+
+---
+
+## Parity Testing
+
+Scripts for verifying Elixir/Python parity:
+- `scripts/parity/dump_tokens_elixir.exs` - Dump Elixir token sequences
+- `scripts/parity/dump_tokens_python.py` - Dump Python token sequences
+- `scripts/parity/compare_tokens.py` - Compare token sequences
+- `scripts/parity/investigations/` - Investigation scripts and reports
+
+Key parity fixes (2025-12-24):
+1. **BOS tokens**: Fixed tokenizer wrapper to pass `add_special_tokens: false`
+2. **Batch ordering**: Created `SupervisedDatasetFromSamples` for lazy datum building with PCG64 shuffle
 
 ---
 
