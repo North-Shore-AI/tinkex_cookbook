@@ -74,7 +74,7 @@ defmodule TinkexCookbook.MixProject do
       {:chroma, "~> 0.1.2"},
 
       # Configuration + CLI parsing (maps to Python chz)
-      {:chz_ex, path: "../chz_ex"},
+      {:chz_ex, "~> 0.1.2"},
 
       # Schema validation (maps to Python pydantic)
       {:sinter, "~> 0.0.1"},
@@ -86,8 +86,9 @@ defmodule TinkexCookbook.MixProject do
       {:tinkex, "~> 0.3.2"},
 
       # North-Shore-AI ecosystem (inspect-ai parity for evaluation)
-      {:crucible_harness, "~> 0.3.1"},
-      {:eval_ex, "~> 0.1.1"},
+      {:crucible_harness, "~> 0.3.2"},
+      {:crucible_bench, "~> 0.3.1"},
+      {:eval_ex, "~> 0.1.2"},
       {:crucible_datasets, "~> 0.5.1"},
 
       # Nx for tensor operations (replaces numpy/torch tensor ops)

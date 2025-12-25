@@ -272,14 +272,52 @@ defmodule TinkexCookbook.Renderers.Types do
 
       iex> TinkexCookbook.Renderers.Types.ensure_text([%TinkexCookbook.Renderers.Types.TextPart{type: "text", text: "Hello"}])
       "Hello"
+
   """
   @spec ensure_text(content()) :: String.t()
   def ensure_text(content) when is_binary(content), do: content
-
   def ensure_text([%TextPart{text: text}]), do: text
+  def ensure_text([%{"type" => "text", "text" => text}]) when is_binary(text), do: text
+  def ensure_text([%{type: "text", text: text}]) when is_binary(text), do: text
 
   def ensure_text(content) when is_list(content) do
     raise ArgumentError,
           "Expected text content, got multimodal content with #{length(content)} parts"
+  end
+
+  @doc """
+  Normalizes content into a list of content parts.
+
+  Strings are wrapped into a single TextPart. Lists of parts are returned as-is
+  after validation.
+  """
+  @spec ensure_parts(content()) :: [content_part()]
+  def ensure_parts(content) when is_binary(content) do
+    [%TextPart{type: "text", text: content}]
+  end
+
+  def ensure_parts(parts) when is_list(parts) do
+    Enum.map(parts, fn
+      %TextPart{} = part ->
+        part
+
+      %ImagePart{} = part ->
+        part
+
+      %{"type" => "text", "text" => text} when is_binary(text) ->
+        %TextPart{type: "text", text: text}
+
+      %{type: "text", text: text} when is_binary(text) ->
+        %TextPart{type: "text", text: text}
+
+      %{"type" => "image", "image" => image} ->
+        %ImagePart{type: "image", image: image}
+
+      %{type: "image", image: image} ->
+        %ImagePart{type: "image", image: image}
+
+      other ->
+        raise ArgumentError, "Invalid content part: #{inspect(other)}"
+    end)
   end
 end

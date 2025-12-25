@@ -127,7 +127,14 @@ defmodule TinkexCookbook.Supervised.Common do
     |> Enum.reverse()
   end
 
-  defp create_rightshifted_model_input_and_leftshifted_targets(chunks) do
+  @doc """
+  Builds a right-shifted ModelInput and left-shifted target token list.
+
+  Used by supervised and RL data processing to align inputs/targets.
+  """
+  @spec create_rightshifted_model_input_and_leftshifted_targets([ModelInput.chunk()]) ::
+          {ModelInput.t(), [non_neg_integer()]}
+  def create_rightshifted_model_input_and_leftshifted_targets(chunks) do
     if chunks == [] do
       raise ArgumentError, "must have at least one chunk"
     end

@@ -54,12 +54,14 @@ defmodule Mix.Tasks.SlBasic do
 
   use Mix.Task
 
+  alias TinkexCookbook.Recipes.SlBasic
+
   @impl Mix.Task
   def run(args) do
     # Ensure the application is started (loads configs, starts dependencies)
     Mix.Task.run("app.start")
 
     # Delegate to the recipe's main function
-    TinkexCookbook.Recipes.SlBasic.main(args)
+    SlBasic.main(args)
   end
 end

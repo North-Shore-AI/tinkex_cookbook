@@ -196,6 +196,13 @@ foundation artifact.
   - Loss-weighting logic (avoid mixing NLL/cross-entropy in the same module) [DONE]
 - Build parity tests that mirror `tinker_cookbook/tests/test_renderers.py`. [TODO]
 
+### Phase 2 Addendum (2025-12-24)
+
+- VL renderers (Qwen3VL/Qwen3VLInstruct) deferred to Phase 3.
+- Tool calling should be implemented as a shared framework module and reused by Qwen3/KimiK2.
+- RL training should ship sync + async paths together using shared core abstractions.
+- See `docs/20251224/phase2_prerequisites/PHASE2_PART1_INFRASTRUCTURE.md` for the detailed infra plan.
+
 ### Phase 3: Tensor/Datum Plumbing [COMPLETE]
 - Implement `Tinkex.TensorData` (use `docs/20251220/12b_tensor_data_implementation.ex`).
 - Build ModelInput/Dataset datum helpers used by supervised/rl/preference flows.

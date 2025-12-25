@@ -32,7 +32,7 @@ defmodule TinkexCookbook.Renderers.Llama3 do
 
   @behaviour TinkexCookbook.Renderers.Renderer
 
-  alias TinkexCookbook.Renderers.Types
+  alias TinkexCookbook.Renderers.{Helpers, Types}
   alias TinkexCookbook.Types.EncodedTextChunk
 
   @type state :: %{tokenizer: module() | map()}
@@ -80,7 +80,15 @@ defmodule TinkexCookbook.Renderers.Llama3 do
   """
   @spec stop_sequences(state()) :: [non_neg_integer()]
   def stop_sequences(%{tokenizer: tokenizer}) do
-    encode(tokenizer, @eot_id, add_special_tokens: false)
+    tokens = encode(tokenizer, @eot_id, add_special_tokens: false)
+
+    case tokens do
+      [token] ->
+        [token]
+
+      _ ->
+        raise ArgumentError, "Expected single token for <|eot_id|>, got #{length(tokens)}"
+    end
   end
 
   @impl true
@@ -100,6 +108,11 @@ defmodule TinkexCookbook.Renderers.Llama3 do
         ) :: {Types.RenderedMessage.t(), state()}
   def render_message(_idx, message, _is_last, %{tokenizer: tokenizer} = state) do
     role = message.role
+
+    unless is_binary(message.content) do
+      raise ArgumentError, "Llama3Renderer only supports message with string content"
+    end
+
     content = Types.ensure_text(message.content)
 
     # Build prefix: <|start_header_id|>{role}<|end_header_id|>\n\n
@@ -127,28 +140,9 @@ defmodule TinkexCookbook.Renderers.Llama3 do
   the message along with a boolean indicating if the response is complete.
   """
   @spec parse_response([non_neg_integer()], state()) :: {Types.Message.t(), boolean()}
-  def parse_response(tokens, %{tokenizer: tokenizer} = _state) do
-    text = decode(tokenizer, tokens)
-
-    case String.split(text, @eot_id) do
-      [content] ->
-        # No eot_id found - incomplete response
-        {Types.message("assistant", content), false}
-
-      [content, ""] ->
-        # Single eot_id at end - complete response
-        {Types.message("assistant", content), true}
-
-      [content, _rest] ->
-        # Single eot_id with trailing content - complete
-        {Types.message("assistant", content), true}
-
-      parts when length(parts) > 2 ->
-        # Multiple eot_id tokens - error
-        raise RuntimeError,
-              "When parsing response, expected to split into 1 or 2 pieces using stop tokens, " <>
-                "but got #{length(parts)}. You probably are using the wrong stop tokens when sampling"
-    end
+  def parse_response(tokens, %{tokenizer: tokenizer} = state) do
+    [stop_token] = stop_sequences(state)
+    Helpers.parse_response_for_stop_token(tokens, tokenizer, stop_token)
   end
 
   # Helper to encode text with either a module or a map tokenizer
@@ -158,14 +152,5 @@ defmodule TinkexCookbook.Renderers.Llama3 do
 
   defp encode(%{encode: encode_fn}, text, opts) when is_function(encode_fn, 2) do
     encode_fn.(text, opts)
-  end
-
-  # Helper to decode tokens with either a module or a map tokenizer
-  defp decode(tokenizer, tokens) when is_atom(tokenizer) do
-    tokenizer.decode(tokens)
-  end
-
-  defp decode(%{decode: decode_fn}, tokens) when is_function(decode_fn, 1) do
-    decode_fn.(tokens)
   end
 end

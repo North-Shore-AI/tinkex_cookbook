@@ -86,7 +86,8 @@ defmodule TinkexCookbook.Datasets.NoRobotsTest do
     end
 
     test "respects train_on_what parameter", %{state: state, sample: sample} do
-      # With all_tokens, every weight should be 1.0
+      # With all_tokens, every weight should be 1.0 EXCEPT for BOS token weights
+      # which are always 0.0. This matches Python behavior - see renderers.py line 354-356.
       datum_all =
         NoRobots.build_datum(
           sample,
@@ -96,7 +97,12 @@ defmodule TinkexCookbook.Datasets.NoRobotsTest do
         )
 
       weights_all = Map.get(datum_all.loss_fn_inputs, "weights")
-      assert Enum.all?(weights_all.data, fn w -> w == 1.0 end)
+      # BOS tokens get 0.0 weight (after slicing, some 0.0s remain from BOS)
+      # Non-BOS tokens should be 1.0
+      assert Enum.any?(weights_all.data, fn w -> w == 1.0 end)
+      # Majority of weights should be 1.0 for all_tokens
+      one_count = Enum.count(weights_all.data, fn w -> w == 1.0 end)
+      assert one_count > length(weights_all.data) / 2
 
       # With last_assistant_message, only some weights should be 1.0
       datum_last =

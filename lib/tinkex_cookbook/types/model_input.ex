@@ -79,10 +79,38 @@ defmodule TinkexCookbook.Types.ModelInput do
     %__MODULE__{chunks: chunks}
   end
 
+  @doc "Creates an empty ModelInput."
+  @spec empty() :: t()
+  def empty do
+    %__MODULE__{chunks: []}
+  end
+
   @doc "Creates a ModelInput from a list of token integers."
   @spec from_ints([non_neg_integer()]) :: t()
   def from_ints(tokens) when is_list(tokens) do
     new([EncodedTextChunk.new(tokens)])
+  end
+
+  @doc """
+  Appends a single token to the ModelInput.
+
+  If the last chunk is a text chunk, it is extended in place; otherwise a new
+  text chunk is appended.
+  """
+  @spec append_int(t(), non_neg_integer()) :: t()
+  def append_int(%__MODULE__{chunks: []}, token) when is_integer(token) do
+    new([EncodedTextChunk.new([token])])
+  end
+
+  def append_int(%__MODULE__{chunks: chunks}, token) when is_integer(token) do
+    case List.last(chunks) do
+      %EncodedTextChunk{tokens: tokens} = last ->
+        updated = %{last | tokens: tokens ++ [token]}
+        %__MODULE__{chunks: List.replace_at(chunks, -1, updated)}
+
+      _ ->
+        %__MODULE__{chunks: chunks ++ [EncodedTextChunk.new([token])]}
+    end
   end
 
   @doc "Returns the total length across all chunks."

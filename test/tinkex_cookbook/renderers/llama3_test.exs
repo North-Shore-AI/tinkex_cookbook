@@ -8,13 +8,13 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
   use ExUnit.Case, async: true
 
   alias TinkexCookbook.Renderers.{Llama3, Renderer, TrainOnWhat, Types}
-  alias TinkexCookbook.Test.MockTokenizer
+  alias TinkexCookbook.Test.SpecialTokenizer
   alias TinkexCookbook.Types.{EncodedTextChunk, ModelInput}
 
   describe "init/1" do
     test "returns {:ok, state} with tokenizer" do
-      assert {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
-      assert state.tokenizer == MockTokenizer
+      assert {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
+      assert state.tokenizer == SpecialTokenizer
     end
 
     test "raises when tokenizer is missing" do
@@ -26,31 +26,31 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
   describe "bos_tokens/1" do
     test "returns Llama3 BOS tokens for <|begin_of_text|>" do
-      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+      {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
       bos = Llama3.bos_tokens(state)
 
       assert is_list(bos)
       # Should encode "<|begin_of_text|>"
-      expected = MockTokenizer.encode("<|begin_of_text|>")
+      expected = SpecialTokenizer.encode("<|begin_of_text|>")
       assert bos == expected
     end
   end
 
   describe "stop_sequences/1" do
     test "returns eot_id token" do
-      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+      {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
       stops = Llama3.stop_sequences(state)
 
       assert is_list(stops)
       # Should return the encoded <|eot_id|> token
-      expected = MockTokenizer.encode("<|eot_id|>")
+      expected = SpecialTokenizer.encode("<|eot_id|>")
       assert stops == expected
     end
   end
 
   describe "render_message/4" do
     setup do
-      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+      {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
       %{state: state}
     end
 
@@ -63,7 +63,7 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
       assert %EncodedTextChunk{tokens: prefix_tokens} = rendered.prefix
 
       # Prefix should be: <|start_header_id|>user<|end_header_id|>\n\n
-      expected_prefix = MockTokenizer.encode("<|start_header_id|>user<|end_header_id|>\n\n")
+      expected_prefix = SpecialTokenizer.encode("<|start_header_id|>user<|end_header_id|>\n\n")
       assert prefix_tokens == expected_prefix
     end
 
@@ -74,7 +74,9 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
       assert %EncodedTextChunk{tokens: prefix_tokens} = rendered.prefix
 
-      expected_prefix = MockTokenizer.encode("<|start_header_id|>assistant<|end_header_id|>\n\n")
+      expected_prefix =
+        SpecialTokenizer.encode("<|start_header_id|>assistant<|end_header_id|>\n\n")
+
       assert prefix_tokens == expected_prefix
     end
 
@@ -85,7 +87,7 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
       assert %EncodedTextChunk{tokens: prefix_tokens} = rendered.prefix
 
-      expected_prefix = MockTokenizer.encode("<|start_header_id|>system<|end_header_id|>\n\n")
+      expected_prefix = SpecialTokenizer.encode("<|start_header_id|>system<|end_header_id|>\n\n")
       assert prefix_tokens == expected_prefix
     end
 
@@ -99,8 +101,18 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
       # Content should be: Hello!<|eot_id|>
       [%EncodedTextChunk{tokens: content_tokens} | _] = rendered.content
-      expected_content = MockTokenizer.encode("Hello!<|eot_id|>")
+      expected_content = SpecialTokenizer.encode("Hello!<|eot_id|>")
       assert content_tokens == expected_content
+    end
+
+    test "rejects non-string content", %{state: state} do
+      message = Types.message("user", [Types.text_part("Hello")])
+
+      assert_raise ArgumentError,
+                   ~r/Llama3Renderer only supports message with string content/,
+                   fn ->
+                     Llama3.render_message(0, message, false, state)
+                   end
     end
 
     test "does not include suffix (Llama3 format has no suffix)", %{state: state} do
@@ -119,19 +131,19 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
       {_rendered1, state1} = Llama3.render_message(0, message1, false, state)
       {_rendered2, state2} = Llama3.render_message(1, message2, true, state1)
 
-      assert state2.tokenizer == MockTokenizer
+      assert state2.tokenizer == SpecialTokenizer
     end
   end
 
   describe "parse_response/2" do
     setup do
-      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+      {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
       %{state: state}
     end
 
     test "parses response with single eot_id correctly", %{state: state} do
       response_text = "The answer is 42.<|eot_id|>"
-      tokens = MockTokenizer.encode(response_text)
+      tokens = SpecialTokenizer.encode(response_text)
 
       {message, is_complete} = Llama3.parse_response(tokens, state)
 
@@ -142,7 +154,7 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
     test "handles response without eot_id (incomplete)", %{state: state} do
       response_text = "Partial response"
-      tokens = MockTokenizer.encode(response_text)
+      tokens = SpecialTokenizer.encode(response_text)
 
       {message, is_complete} = Llama3.parse_response(tokens, state)
 
@@ -153,7 +165,7 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
     test "raises on double eot_id", %{state: state} do
       response_text = "Text<|eot_id|>More<|eot_id|>"
-      tokens = MockTokenizer.encode(response_text)
+      tokens = SpecialTokenizer.encode(response_text)
 
       assert_raise RuntimeError, ~r/expected to split into 1 or 2/, fn ->
         Llama3.parse_response(tokens, state)
@@ -163,7 +175,7 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
   describe "integration with Renderer module" do
     setup do
-      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+      {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
       %{state: state}
     end
 
@@ -226,8 +238,12 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
           state
         )
 
-      # All weights should be 1.0
-      assert Enum.all?(weights, fn w -> w == 1.0 end)
+      bos_len = length(Llama3.bos_tokens(state))
+      {bos_weights, rest_weights} = Enum.split(weights, bos_len)
+
+      # BOS tokens should be weight 0.0, everything else weight 1.0
+      assert Enum.all?(bos_weights, fn w -> w == 0.0 end)
+      assert Enum.all?(rest_weights, fn w -> w == 1.0 end)
       assert length(weights) == ModelInput.length(model_input)
     end
 
@@ -266,14 +282,14 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
       # Last chunk should be the prefill
       %EncodedTextChunk{tokens: prefill_tokens} = List.last(model_input.chunks)
-      expected_prefill = MockTokenizer.encode("The answer is")
+      expected_prefill = SpecialTokenizer.encode("The answer is")
       assert prefill_tokens == expected_prefill
     end
   end
 
   describe "Llama3 format compliance" do
     setup do
-      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+      {:ok, state} = Llama3.init(tokenizer: SpecialTokenizer)
       %{state: state}
     end
 
@@ -294,7 +310,7 @@ defmodule TinkexCookbook.Renderers.Llama3Test do
 
       # Get all tokens
       all_tokens = ModelInput.all_tokens(model_input)
-      decoded = MockTokenizer.decode(all_tokens)
+      decoded = SpecialTokenizer.decode(all_tokens)
 
       # Should contain BOS
       assert String.contains?(decoded, "<|begin_of_text|>")

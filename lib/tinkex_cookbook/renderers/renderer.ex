@@ -106,14 +106,31 @@ defmodule TinkexCookbook.Renderers.Renderer do
           state()
         ) :: {ModelInput.t(), [float()]}
   def build_supervised_example(renderer_module, messages, train_on_what, state) do
+    if function_exported?(renderer_module, :build_supervised_example, 3) do
+      renderer_module.build_supervised_example(messages, train_on_what, state)
+    else
+      build_supervised_example_default(renderer_module, messages, train_on_what, state)
+    end
+  end
+
+  @doc """
+  Default implementation for supervised example building.
+  """
+  @spec build_supervised_example_default(
+          module(),
+          [Types.Message.t()],
+          TrainOnWhat.t(),
+          state()
+        ) :: {ModelInput.t(), [float()]}
+  def build_supervised_example_default(renderer_module, messages, train_on_what, state) do
     # Validate train_on_what usage
     validate_train_on_what!(messages, train_on_what)
 
     message_count = length(messages)
 
-    # Start with BOS tokens (weight = 0 unless all_tokens)
+    # Start with BOS tokens (weight is always 0.0, matching Python)
     bos = renderer_module.bos_tokens(state)
-    bos_weight = if train_on_what == TrainOnWhat.all_tokens(), do: 1.0, else: 0.0
+    bos_weight = 0.0
 
     initial_chunks_weights =
       if bos != [], do: [{%EncodedTextChunk{tokens: bos}, bos_weight}], else: []
@@ -169,6 +186,30 @@ defmodule TinkexCookbook.Renderers.Renderer do
         prefill \\ nil,
         state
       ) do
+    if function_exported?(renderer_module, :build_generation_prompt, 4) do
+      renderer_module.build_generation_prompt(messages, role, prefill, state)
+    else
+      build_generation_prompt_default(renderer_module, messages, role, prefill, state)
+    end
+  end
+
+  @doc """
+  Default implementation for generation prompt building.
+  """
+  @spec build_generation_prompt_default(
+          module(),
+          [Types.Message.t()],
+          String.t(),
+          String.t() | nil,
+          state()
+        ) :: {ModelInput.t(), state()}
+  def build_generation_prompt_default(
+        renderer_module,
+        messages,
+        role,
+        prefill,
+        state
+      ) do
     # Start with BOS tokens
     bos = renderer_module.bos_tokens(state)
     initial_chunks = if bos != [], do: [%EncodedTextChunk{tokens: bos}], else: []
@@ -183,7 +224,7 @@ defmodule TinkexCookbook.Renderers.Renderer do
         acc_with_parts =
           acc ++
             if(rendered.prefix, do: [rendered.prefix], else: []) ++
-            rendered.content
+            Enum.filter(rendered.content, & &1)
 
         {acc_with_parts, new_state}
       end)

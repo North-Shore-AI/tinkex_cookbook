@@ -170,8 +170,12 @@ defmodule TinkexCookbook.Renderers.RendererTest do
           state
         )
 
-      # All weights should be 1.0
-      assert Enum.all?(weights, fn w -> w == 1.0 end)
+      bos_len = length(TestLlama3Renderer.bos_tokens(state))
+      {bos_weights, rest_weights} = Enum.split(weights, bos_len)
+
+      # BOS tokens should be weight 0.0, everything else weight 1.0
+      assert Enum.all?(bos_weights, fn w -> w == 0.0 end)
+      assert Enum.all?(rest_weights, fn w -> w == 1.0 end)
       assert length(weights) == ModelInput.length(model_input)
     end
 

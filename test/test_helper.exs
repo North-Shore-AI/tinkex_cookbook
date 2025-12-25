@@ -4,6 +4,7 @@ ExUnit.start(exclude: [:integration])
 
 # Compile support modules
 Code.require_file("support/mock_tokenizer.ex", __DIR__)
+Code.require_file("support/mock_tokenizer_special.ex", __DIR__)
 Code.require_file("support/mock_tinkex.ex", __DIR__)
 
 Mox.defmock(TinkexCookbook.Ports.VectorStoreMock, for: TinkexCookbook.Ports.VectorStore)

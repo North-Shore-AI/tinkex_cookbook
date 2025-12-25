@@ -5,6 +5,8 @@ defmodule TinkexCookbook.Test.MockTinkex do
   These mocks provide deterministic responses that match the Tinkex API structure.
   """
 
+  alias TinkexCookbook.Test.MockTinkex.SamplingClient
+
   defmodule TrainingClient do
     @moduledoc """
     Mock training client that returns predictable training outputs.
@@ -29,8 +31,8 @@ defmodule TinkexCookbook.Test.MockTinkex do
     @doc """
     Mock forward_backward that returns deterministic loss metrics.
     """
-    @spec forward_backward(t(), list()) :: {:ok, map()}
-    def forward_backward(%__MODULE__{} = _client, batch) do
+    @spec forward_backward(t(), list(), atom() | String.t()) :: {:ok, Task.t()}
+    def forward_backward(%__MODULE__{} = _client, batch, _loss_fn \\ :cross_entropy) do
       loss = 0.5 - length(batch) * 0.01
 
       output = %{
@@ -42,31 +44,71 @@ defmodule TinkexCookbook.Test.MockTinkex do
         metrics: %{"loss" => max(loss, 0.01)}
       }
 
-      {:ok, output}
+      {:ok, Task.async(fn -> {:ok, output} end)}
+    end
+
+    @doc """
+    Mock forward_backward_custom for DPO.
+    """
+    @spec forward_backward_custom(t(), list(), term()) :: {:ok, Task.t()}
+    def forward_backward_custom(%__MODULE__{} = client, batch, loss_fn \\ :custom) do
+      forward_backward(client, batch, loss_fn)
     end
 
     @doc """
     Mock optim_step that simulates optimizer update.
     """
-    @spec optim_step(t()) :: :ok
-    def optim_step(%__MODULE__{} = _client) do
-      :ok
-    end
-
-    @doc """
-    Mock optim_step with adam params.
-    """
-    @spec optim_step(t(), map()) :: :ok
+    @spec optim_step(t(), map()) :: {:ok, Task.t()}
     def optim_step(%__MODULE__{} = _client, _adam_params) do
-      :ok
+      {:ok, Task.async(fn -> {:ok, %{}} end)}
     end
 
     @doc """
-    Mock save_weights that returns a checkpoint path.
+    Mock save_weights_for_sampler that returns a checkpoint path.
     """
-    @spec save_weights(t(), String.t()) :: {:ok, String.t()}
-    def save_weights(%__MODULE__{} = _client, name) do
-      {:ok, "/tmp/mock_checkpoint_#{name}"}
+    @spec save_weights_for_sampler(t(), String.t()) :: {:ok, Task.t()}
+    def save_weights_for_sampler(%__MODULE__{} = _client, name) do
+      {:ok, Task.async(fn -> {:ok, %{path: "/tmp/mock_sampler_#{name}"}} end)}
+    end
+
+    @doc """
+    Mock save_state that returns a checkpoint path.
+    """
+    @spec save_state(t(), String.t()) :: {:ok, Task.t()}
+    def save_state(%__MODULE__{} = _client, name) do
+      {:ok, Task.async(fn -> {:ok, %{path: "/tmp/mock_state_#{name}"}} end)}
+    end
+
+    @doc """
+    Mock load_state that returns a response map.
+    """
+    @spec load_state(t(), String.t()) :: {:ok, Task.t()}
+    def load_state(%__MODULE__{} = _client, _path) do
+      {:ok, Task.async(fn -> {:ok, %{}} end)}
+    end
+
+    @doc """
+    Mock load_state_with_optimizer that returns a response map.
+    """
+    @spec load_state_with_optimizer(t(), String.t()) :: {:ok, Task.t()}
+    def load_state_with_optimizer(%__MODULE__{} = _client, _path) do
+      {:ok, Task.async(fn -> {:ok, %{}} end)}
+    end
+
+    @doc """
+    Mock save_weights_and_get_sampling_client that returns a sampling client.
+    """
+    @spec save_weights_and_get_sampling_client(t(), keyword()) :: {:ok, Task.t()}
+    def save_weights_and_get_sampling_client(%__MODULE__{} = _client, _opts \\ []) do
+      {:ok, Task.async(fn -> {:ok, SamplingClient.new()} end)}
+    end
+
+    @doc """
+    Mock create_sampling_client_async that returns a sampling client.
+    """
+    @spec create_sampling_client_async(t(), String.t()) :: Task.t()
+    def create_sampling_client_async(%__MODULE__{} = _client, _path) do
+      Task.async(fn -> {:ok, SamplingClient.new()} end)
     end
   end
 
@@ -97,8 +139,8 @@ defmodule TinkexCookbook.Test.MockTinkex do
     @doc """
     Mock sample that returns deterministic token sequences.
     """
-    @spec sample(t(), any(), keyword()) :: {:ok, map()}
-    def sample(%__MODULE__{response_tokens: tokens} = _client, _model_input, _opts \\ []) do
+    @spec sample(t(), any(), map(), keyword()) :: {:ok, Task.t()}
+    def sample(%__MODULE__{response_tokens: tokens} = _client, _model_input, _params, _opts \\ []) do
       response = %{
         sequences: [
           %{
@@ -112,7 +154,28 @@ defmodule TinkexCookbook.Test.MockTinkex do
         type: "sample"
       }
 
-      {:ok, response}
+      {:ok, Task.async(fn -> {:ok, response} end)}
+    end
+
+    @doc """
+    Mock compute_logprobs that returns a list of logprobs aligned to input length.
+    """
+    @spec compute_logprobs(t(), any(), keyword()) :: {:ok, Task.t()}
+    def compute_logprobs(%__MODULE__{} = _client, model_input, _opts \\ []) do
+      length =
+        case model_input do
+          %Tinkex.Types.ModelInput{chunks: chunks} ->
+            Enum.reduce(chunks, 0, fn
+              %Tinkex.Types.EncodedTextChunk{tokens: tokens}, acc -> acc + length(tokens)
+              %Tinkex.Types.ImageChunk{expected_tokens: n}, acc -> acc + (n || 0)
+              _chunk, acc -> acc
+            end)
+
+          _ ->
+            0
+        end
+
+      {:ok, Task.async(fn -> {:ok, List.duplicate(-1.0, length)} end)}
     end
   end
 
@@ -144,11 +207,48 @@ defmodule TinkexCookbook.Test.MockTinkex do
     end
 
     @doc """
+    Async mock training client creation.
+    """
+    @spec create_lora_training_client_async(t(), String.t(), keyword()) :: Task.t()
+    def create_lora_training_client_async(%__MODULE__{} = _client, _model, opts \\ []) do
+      Task.async(fn -> {:ok, TrainingClient.new(opts)} end)
+    end
+
+    @doc """
     Creates a mock sampling client.
     """
     @spec create_sampling_client(t(), keyword()) :: {:ok, SamplingClient.t()}
     def create_sampling_client(%__MODULE__{} = _client, opts \\ []) do
       {:ok, SamplingClient.new(opts)}
+    end
+
+    @doc """
+    Async mock sampling client creation.
+    """
+    @spec create_sampling_client_async(t(), keyword()) :: Task.t()
+    def create_sampling_client_async(%__MODULE__{} = _client, _opts \\ []) do
+      Task.async(fn -> {:ok, SamplingClient.new()} end)
+    end
+
+    @doc """
+    Async mock training client creation from state.
+    """
+    @spec create_training_client_from_state_async(t(), String.t(), keyword()) :: Task.t()
+    def create_training_client_from_state_async(%__MODULE__{} = _client, _path, _opts \\ []) do
+      Task.async(fn -> {:ok, TrainingClient.new()} end)
+    end
+
+    @doc """
+    Async mock training client creation from state with optimizer.
+    """
+    @spec create_training_client_from_state_with_optimizer_async(t(), String.t(), keyword()) ::
+            Task.t()
+    def create_training_client_from_state_with_optimizer_async(
+          %__MODULE__{} = _client,
+          _path,
+          _opts \\ []
+        ) do
+      Task.async(fn -> {:ok, TrainingClient.new()} end)
     end
   end
 end

@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Refactor.Nesting
 defmodule TinkexCookbook.Utils.Parity do
   @moduledoc """
   Parity instrumentation for Elixir tinkex_cookbook.
@@ -9,7 +10,7 @@ defmodule TinkexCookbook.Utils.Parity do
   Artifacts are written to the log_path directory under a `parity/` subdirectory.
   """
 
-  alias TinkexCookbook.Types.{Datum, ModelInput, TensorData, EncodedTextChunk}
+  alias TinkexCookbook.Types.{Datum, EncodedTextChunk, ModelInput, TensorData}
 
   require Logger
 

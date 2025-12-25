@@ -38,6 +38,7 @@ defmodule TinkexCookbook.Supervised.Train do
 
   alias TinkexCookbook.Supervised.SupervisedDataset
   alias TinkexCookbook.Types.Datum
+  alias TinkexCookbook.Utils.LRScheduling
 
   defmodule TrainConfig do
     @moduledoc """
@@ -100,15 +101,15 @@ defmodule TinkexCookbook.Supervised.Train do
   """
   @spec training_step(struct(), [Datum.t()], map()) :: {:ok, map()} | {:error, term()}
   def training_step(training_client, batch, adam_params) do
-    case training_client.__struct__.forward_backward(training_client, batch) do
-      {:ok, fwd_bwd_result} ->
-        :ok = training_client.__struct__.optim_step(training_client, adam_params)
-
-        metrics = fwd_bwd_result[:metrics] || fwd_bwd_result["metrics"] || %{}
-        {:ok, metrics}
-
-      {:error, reason} ->
-        {:error, reason}
+    with {:ok, fb_task} <- training_client.__struct__.forward_backward(training_client, batch),
+         {:ok, fb_output} <- Task.await(fb_task, :infinity),
+         {:ok, optim_task} <- training_client.__struct__.optim_step(training_client, adam_params),
+         {:ok, _optim_output} <- Task.await(optim_task, :infinity) do
+      metrics = fb_output[:metrics] || fb_output["metrics"] || %{}
+      {:ok, metrics}
+    else
+      {:error, reason} -> {:error, reason}
+      other -> {:error, other}
     end
   end
 
@@ -124,18 +125,16 @@ defmodule TinkexCookbook.Supervised.Train do
   @spec compute_lr(float(), non_neg_integer(), pos_integer(), TrainConfig.lr_schedule()) ::
           float()
   def compute_lr(base_lr, step, total_steps, schedule) do
-    progress = step / max(total_steps - 1, 1)
+    denom = if total_steps > 0, do: total_steps, else: 1
 
-    case schedule do
-      :constant ->
-        base_lr
+    multiplier =
+      LRScheduling.compute_schedule_lr_multiplier(
+        schedule,
+        step,
+        denom
+      )
 
-      :linear ->
-        base_lr * (1.0 - progress)
-
-      :cosine ->
-        base_lr * 0.5 * (1.0 + :math.cos(:math.pi() * progress))
-    end
+    base_lr * multiplier
   end
 
   @doc """

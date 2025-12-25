@@ -106,6 +106,12 @@ defmodule TinkexCookbook.Renderers.TypesTest do
       assert Types.ensure_text(content) == "Hello"
     end
 
+    test "extracts text from single text part map" do
+      content = [%{"type" => "text", "text" => "Hello"}]
+
+      assert Types.ensure_text(content) == "Hello"
+    end
+
     test "raises for multimodal content" do
       content = [
         Types.text_part("Hello"),
@@ -126,6 +132,29 @@ defmodule TinkexCookbook.Renderers.TypesTest do
       assert_raise ArgumentError, ~r/Expected text content/, fn ->
         Types.ensure_text(content)
       end
+    end
+  end
+
+  describe "ensure_parts/1" do
+    test "wraps string content into a single text part" do
+      [part] = Types.ensure_parts("Hello")
+      assert part.type == "text"
+      assert part.text == "Hello"
+    end
+
+    test "accepts text and image part structs" do
+      parts = [Types.text_part("Hello"), Types.image_part("https://example.com/img.jpg")]
+      assert Types.ensure_parts(parts) == parts
+    end
+
+    test "accepts map content parts" do
+      parts = [
+        %{"type" => "text", "text" => "Hello"},
+        %{"type" => "image", "image" => "https://example.com/img.jpg"}
+      ]
+
+      normalized = Types.ensure_parts(parts)
+      assert [%Types.TextPart{}, %Types.ImagePart{}] = normalized
     end
   end
 

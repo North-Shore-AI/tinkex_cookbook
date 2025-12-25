@@ -52,6 +52,9 @@ then port roughly half of the cookbook recipes.
 - Dataset builders for chat + RL + preference
 - Tokenizer utilities + renderer coverage for major model families (Llama3, Qwen3, DeepSeek)
   - This is formatting + tokenization only; no local inference (no llama.cpp needed).
+- Tool calling framework (shared encode/decode) reused by Qwen3/KimiK2 and future tool-use recipes.
+- RL training paths built sync + async together (shared core functions, no staged rollout).
+- VL renderers (Qwen3VL/Qwen3VLInstruct) deferred to Phase 3.
 - `TensorData` + Datum builders for training + sampling flows
 - Logging, checkpointing, and trace utilities
   - Defer `chromadb` until tool_use/search is in scope; prefer `chroma` (HTTP client).

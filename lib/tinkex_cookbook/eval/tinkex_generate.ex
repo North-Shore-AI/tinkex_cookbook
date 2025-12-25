@@ -79,6 +79,12 @@ defmodule TinkexCookbook.Eval.TinkexGenerate do
 
     # Call sampling client
     case sampling_client.__struct__.sample(sampling_client, model_input, sampling_params) do
+      {:ok, %Task{} = task} ->
+        with {:ok, sample_response} <- Task.await(task, :infinity) do
+          response = format_response(sample_response, config)
+          {:ok, response}
+        end
+
       {:ok, sample_response} ->
         response = format_response(sample_response, config)
         {:ok, response}

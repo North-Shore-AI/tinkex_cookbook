@@ -6,24 +6,32 @@
 
 Elixir port of `tinker-cookbook`: training and evaluation recipes for the Tinker ML platform.
 
-## Status: Phase 1 Complete
+## Status: Phase 1 Complete, Phase 2 Part 1 Infrastructure Complete
 
-Phase 1 delivers a working foundation for supervised learning with the `sl_basic` recipe.
+Phase 1 delivers a working foundation for supervised learning with the `sl_basic` recipe. Phase 2 Part 1 adds the shared infrastructure needed for RL, preference/DPO, and distillation recipes.
 
 ### Completed Features
 
-- **Llama3 Renderer**: Full implementation of Llama 3 chat template rendering
-- **NoRobots Dataset Builder**: Integration with HuggingFace datasets
-- **Supervised Training Module**: Training loop orchestration with Tinkex clients
-- **TinkexGenerate Adapter**: Bridges CrucibleHarness evaluation to Tinkex sampling
-- **Evaluation Runner**: Simple evaluation orchestration with scoring
+- **Renderers**: Llama3 + Qwen3/DeepSeek/KimiK2/GptOss/RoleColon (tool calling framework included)
+- **Datasets**: NoRobots + preference/DPO and distillation dataset builders
+- **Training Loops**: Supervised + RL (sync/async) + DPO + on-policy distillation
+- **Completers + Checkpointing**: Token/message completers and checkpoint utilities
+- **Eval + Utilities**: TinkexGenerate, Eval runner, logtree/trace/display helpers
 
-### Quality Gates
+### Quality Gates (Phase 1 baseline, 2025-12-24)
 
-- 165 tests passing
+- 174 tests passing
 - Zero compiler warnings
 - Credo strict: clean
 - Dialyzer: no type errors
+
+### Phase 2 Part 1 Decisions (2025-12-24)
+
+- **VL renderers deferred:** Qwen3VL/Qwen3VLInstruct move to Phase 3; Phase 2 recipes should avoid VL models.
+- **Tool calling framework:** Implement shared tool-call encode/decode utilities and reuse them across renderers.
+- **Sync + async RL together:** Build sync and async RL training paths in the same pass with shared core abstractions.
+
+See `docs/20251224/phase2_prerequisites/PHASE2_PART1_INFRASTRUCTURE.md` for the updated infrastructure plan.
 
 ## Installation
 

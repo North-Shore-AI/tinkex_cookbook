@@ -13,6 +13,14 @@ You are a senior Elixir engineer tasked with critically reviewing the Phase 2 Pa
 3. **Correct errors** - wrong LOC counts, incorrect type signatures, misunderstood patterns
 4. **Update the document** with your corrections directly
 
+## Decisions (2025-12-24)
+
+These decisions are fixed and should be reflected in the infra doc:
+
+1. **VL renderers deferred:** Qwen3VL/Qwen3VLInstruct are Phase 3, not Phase 2 Part 1.
+2. **Tool calling framework:** Implement shared tool-call encode/decode at the framework level.
+3. **Sync + async RL together:** Do not phase async later; build both paths together.
+
 ---
 
 ## Codebases to Review
@@ -59,7 +67,8 @@ eval/                     # TinkexGenerate adapter
 
 - [ ] Count actual LOC for each Python renderer (not estimates)
 - [ ] Verify renderer method signatures match document
-- [ ] Check if VL variants are needed for Phase 2 recipes
+- [ ] Confirm VL variants are explicitly deferred to Phase 3 and documented as such
+- [ ] Confirm tool calling is documented as a shared framework module (not per-renderer copy/paste)
 - [ ] Identify any special token handling not documented
 - [ ] Verify Qwen3 thinking mode logic is accurately described
 - [ ] Check DeepSeek separator characters (unicode)
@@ -88,7 +97,7 @@ eval/                     # TinkexGenerate adapter
 
 **Questions to answer:**
 - What loss functions does Tinkex support? (importance_sampling, ppo, others?)
-- Is there async training we need for Phase 2, or can we start sync-only?
+- Is async training included alongside sync in the Phase 2 plan?
 - What's the actual flow of `train_step` vs `do_sync_training`?
 
 ### 4. DPO Analysis
@@ -228,7 +237,7 @@ Before completing the review, ensure these are addressed in the document:
    - Some infrastructure is shared, some is per-recipe. Is the split correct?
 
 3. **Are the async patterns appropriate for Elixir?**
-   - The document suggests Task.async_stream. Is this the right choice?
+   - The plan requires sync + async together. Is the abstraction shared and correct?
 
 4. **What about testing infrastructure?**
    - Mock tokenizers, mock clients - do we have these? Do we need more?

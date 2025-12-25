@@ -102,7 +102,7 @@ defmodule TinkexCookbook.Eval.TinkexGenerateTest do
     setup do
       %{
         renderer_module: TinkexCookbook.Renderers.Llama3,
-        tokenizer: TinkexCookbook.Test.MockTokenizer
+        tokenizer: TinkexCookbook.Test.SpecialTokenizer
       }
     end
 
@@ -112,10 +112,11 @@ defmodule TinkexCookbook.Eval.TinkexGenerateTest do
     } do
       {:ok, state} = renderer_module.init(tokenizer: tokenizer)
 
+      # Use SpecialTokenizer.encode to properly encode the response with special tokens
       sample_response = %{
         sequences: [
           %{
-            tokens: String.to_charlist("The answer is 4.<|eot_id|>"),
+            tokens: tokenizer.encode("The answer is 4.<|eot_id|>"),
             text: "The answer is 4.<|eot_id|>",
             stop_reason: "end_of_turn",
             logprobs: []

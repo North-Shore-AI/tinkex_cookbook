@@ -53,6 +53,18 @@ defmodule TinkexCookbook.Types.ModelInputTest do
       assert ModelInput.length(model_input) == 5
     end
 
+    test "empty/0 creates a ModelInput with no chunks" do
+      model_input = ModelInput.empty()
+      assert model_input.chunks == []
+    end
+
+    test "append_int/2 appends tokens to the last text chunk" do
+      model_input = ModelInput.from_ints([1, 2])
+      appended = ModelInput.append_int(model_input, 3)
+
+      assert ModelInput.all_tokens(appended) == [1, 2, 3]
+    end
+
     test "all_tokens/1 extracts all tokens from text chunks" do
       chunk1 = EncodedTextChunk.new([1, 2, 3])
       chunk2 = EncodedTextChunk.new([4, 5])

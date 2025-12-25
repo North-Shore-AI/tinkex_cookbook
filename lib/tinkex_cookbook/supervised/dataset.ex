@@ -128,6 +128,7 @@ defmodule TinkexCookbook.Supervised.SupervisedDatasetFromSamples do
 
   @behaviour TinkexCookbook.Supervised.SupervisedDataset
 
+  alias HfDatasetsEx.PRNG.PCG64
   alias TinkexCookbook.Types.Datum
 
   @type datum_builder :: (map() -> Datum.t())
@@ -201,8 +202,71 @@ defmodule TinkexCookbook.Supervised.SupervisedDatasetFromSamples do
   def set_epoch(%__MODULE__{samples: samples} = dataset, seed) do
     # Use PCG64 PRNG directly (same algorithm as Python's numpy.random.Generator)
     # This ensures identical shuffle order to Python's datasets.Dataset.shuffle
-    prng_state = HfDatasetsEx.PRNG.PCG64.seed(seed)
-    {shuffled, _final_state} = HfDatasetsEx.PRNG.PCG64.shuffle(samples, prng_state)
+    prng_state = PCG64.seed(seed)
+    {shuffled, _final_state} = PCG64.shuffle(samples, prng_state)
+
+    %{dataset | shuffled_samples: shuffled}
+  end
+end
+
+defmodule TinkexCookbook.Supervised.SupervisedDatasetFromSamplesFlatMap do
+  @moduledoc """
+  A supervised dataset that stores samples and flatmaps to datums lazily.
+
+  This mirrors Python's `SupervisedDatasetFromHFDataset` with `flatmap_fn`,
+  producing zero or more datums per sample during `get_batch/2`.
+  """
+
+  @behaviour TinkexCookbook.Supervised.SupervisedDataset
+
+  alias HfDatasetsEx.PRNG.PCG64
+  alias TinkexCookbook.Types.Datum
+
+  @type flatmap_fn :: (map() -> [Datum.t()])
+
+  @type t :: %__MODULE__{
+          samples: [map()],
+          shuffled_samples: [map()] | nil,
+          batch_size: pos_integer(),
+          flatmap_fn: flatmap_fn()
+        }
+
+  @enforce_keys [:samples, :batch_size, :flatmap_fn]
+  defstruct [:samples, :shuffled_samples, :batch_size, :flatmap_fn]
+
+  @spec new([map()], pos_integer(), flatmap_fn()) :: t()
+  def new(samples, batch_size, flatmap_fn)
+      when is_list(samples) and batch_size > 0 and is_function(flatmap_fn, 1) do
+    %__MODULE__{
+      samples: samples,
+      shuffled_samples: nil,
+      batch_size: batch_size,
+      flatmap_fn: flatmap_fn
+    }
+  end
+
+  @impl true
+  @spec get_batch(t(), non_neg_integer()) :: [Datum.t()]
+  def get_batch(%__MODULE__{batch_size: batch_size, flatmap_fn: flatmap_fn} = dataset, index) do
+    samples = dataset.shuffled_samples || dataset.samples
+    start = index * batch_size
+
+    samples
+    |> Enum.slice(start, batch_size)
+    |> Enum.flat_map(flatmap_fn)
+  end
+
+  @impl true
+  @spec length(t()) :: non_neg_integer()
+  def length(%__MODULE__{samples: samples, batch_size: batch_size}) do
+    div(Enum.count(samples), batch_size)
+  end
+
+  @impl true
+  @spec set_epoch(t(), non_neg_integer()) :: t()
+  def set_epoch(%__MODULE__{samples: samples} = dataset, seed) do
+    prng_state = PCG64.seed(seed)
+    {shuffled, _final_state} = PCG64.shuffle(samples, prng_state)
 
     %{dataset | shuffled_samples: shuffled}
   end
