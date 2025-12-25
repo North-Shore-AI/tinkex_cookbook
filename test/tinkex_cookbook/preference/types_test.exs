@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.Preference.TypesTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Preference.{
     Comparison,
     ComparisonRendererFromChatRenderer,
@@ -99,13 +101,19 @@ defmodule TinkexCookbook.Preference.TypesTest do
                comparison
              )
 
-    assert 0.0 ==
-             PreferenceModel.score(
-               %PreferenceModelFromChatRenderer{
-                 comparison_renderer: pref_renderer,
-                 sampling_client: MockTinkex.SamplingClient.new(response_tokens: ~c"Unknown")
-               },
-               comparison
-             )
+    log =
+      capture_log(fn ->
+        assert 0.0 ==
+                 PreferenceModel.score(
+                   %PreferenceModelFromChatRenderer{
+                     comparison_renderer: pref_renderer,
+                     sampling_client: MockTinkex.SamplingClient.new(response_tokens: ~c"Unknown")
+                   },
+                   comparison
+                 )
+      end)
+
+    assert log =~ "Invalid preference model output"
+    assert log =~ "Unknown"
   end
 end

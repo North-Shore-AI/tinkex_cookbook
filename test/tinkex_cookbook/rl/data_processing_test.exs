@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.RL.DataProcessingTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Completers.TokensWithLogprobs
   alias TinkexCookbook.RL.{DataProcessing, Trajectory, TrajectoryGroup, Transition}
   alias TinkexCookbook.Types.{ModelInput, TensorData}
@@ -96,6 +98,12 @@ defmodule TinkexCookbook.RL.DataProcessingTest do
     assert DataProcessing.remove_constant_reward_groups([uniform_group, mixed_group]) ==
              [mixed_group]
 
-    assert DataProcessing.remove_constant_reward_groups([uniform_group]) == [uniform_group]
+    log =
+      capture_log(fn ->
+        assert DataProcessing.remove_constant_reward_groups([uniform_group]) == [uniform_group]
+      end)
+
+    assert log =~ "All rewards are uniform"
+    assert log =~ "no gradient"
   end
 end

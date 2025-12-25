@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.RL.PreferenceEnvsTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Completers.TokensWithLogprobs
   alias TinkexCookbook.Preference.Comparison
   alias TinkexCookbook.Renderers.{RoleColon, Types}
@@ -47,12 +49,19 @@ defmodule TinkexCookbook.RL.PreferenceEnvsTest do
       trajectory_with_response("B\n\nUser:")
     ]
 
-    rewards = PairwisePreferenceGroupBuilder.compute_group_rewards(builder, trajectories, [])
+    log =
+      capture_log(fn ->
+        rewards = PairwisePreferenceGroupBuilder.compute_group_rewards(builder, trajectories, [])
 
-    assert [
-             {-1.0, %{"format" => true, "win_minus_loss" => -1.0}},
-             {1.0, %{"format" => true, "win_minus_loss" => 1.0}}
-           ] = rewards
+        assert [
+                 {-1.0, %{"format" => true, "win_minus_loss" => -1.0}},
+                 {1.0, %{"format" => true, "win_minus_loss" => 1.0}}
+               ] = rewards
+      end)
+
+    assert log =~ "Got 2 trajectories, doing 1 pairwise matchups"
+    assert log =~ "Matchup (0 vs 1)"
+    assert log =~ "Valid format: true"
   end
 
   defp trajectory_with_response(text) do

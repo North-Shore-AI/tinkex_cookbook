@@ -1,0 +1,232 @@
+{
+  "Qwen__Qwen3-0.6B": {
+    "model_name": "Qwen/Qwen3-0.6B",
+    "generation": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        },
+        {
+          "role": "user",
+          "content": "What is the capital of France?"
+        }
+      ],
+      "augmented_messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        },
+        {
+          "role": "user",
+          "content": "What is the capital of France?"
+        }
+      ],
+      "expected_tokens": [
+        151644,
+        872,
+        198,
+        9707,
+        11,
+        1246,
+        525,
+        498,
+        30,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        40,
+        2776,
+        6915,
+        11,
+        9702,
+        498,
+        0,
+        151645,
+        198,
+        151644,
+        872,
+        198,
+        3838,
+        374,
+        279,
+        6722,
+        315,
+        9625,
+        30,
+        151645,
+        198,
+        151644,
+        77091,
+        198
+      ],
+      "decoded": "<|im_start|>user\nHello, how are you?<|im_end|>\n<|im_start|>assistant\nI'm fine, thank you!<|im_end|>\n<|im_start|>user\nWhat is the capital of France?<|im_end|>\n<|im_start|>assistant\n"
+    },
+    "supervised": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        }
+      ],
+      "augmented_messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        }
+      ],
+      "expected_tokens": [
+        151644,
+        872,
+        198,
+        9707,
+        11,
+        1246,
+        525,
+        498,
+        30,
+        151645,
+        198,
+        151644,
+        77091,
+        198,
+        151667,
+        271,
+        151668,
+        271,
+        358,
+        2776,
+        6915,
+        11,
+        9702,
+        498,
+        0,
+        151645,
+        198
+      ],
+      "decoded": "<|im_start|>user\nHello, how are you?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n I'm fine, thank you!<|im_end|>\n"
+    }
+  },
+  "deepseek-ai__DeepSeek-R1-0528-Qwen3-8B": {
+    "model_name": "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
+    "generation": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        },
+        {
+          "role": "user",
+          "content": "What is the capital of France?"
+        }
+      ],
+      "augmented_messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        },
+        {
+          "role": "user",
+          "content": "What is the capital of France?"
+        }
+      ],
+      "expected_tokens": [
+        151643,
+        151669,
+        9707,
+        11,
+        1246,
+        525,
+        498,
+        30,
+        151670,
+        40,
+        2776,
+        6915,
+        11,
+        9702,
+        498,
+        0,
+        151645,
+        151669,
+        3838,
+        374,
+        279,
+        6722,
+        315,
+        9625,
+        30,
+        151670
+      ],
+      "decoded": "<\uff5cbegin\u2581of\u2581sentence\uff5c><\uff5cUser\uff5c>Hello, how are you?<\uff5cAssistant\uff5c>I'm fine, thank you!<\uff5cend\u2581of\u2581sentence\uff5c><\uff5cUser\uff5c>What is the capital of France?<\uff5cAssistant\uff5c>"
+    },
+    "supervised": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        }
+      ],
+      "augmented_messages": [
+        {
+          "role": "user",
+          "content": "Hello, how are you?"
+        },
+        {
+          "role": "assistant",
+          "content": "I'm fine, thank you!"
+        }
+      ],
+      "expected_tokens": [
+        151643,
+        151669,
+        9707,
+        11,
+        1246,
+        525,
+        498,
+        30,
+        151670,
+        40,
+        2776,
+        6915,
+        11,
+        9702,
+        498,
+        0,
+        151645
+      ],
+      "decoded": "<\uff5cbegin\u2581of\u2581sentence\uff5c><\uff5cUser\uff5c>Hello, how are you?<\uff5cAssistant\uff5c>I'm fine, thank you!<\uff5cend\u2581of\u2581sentence\uff5c>"
+    }
+  }
+}

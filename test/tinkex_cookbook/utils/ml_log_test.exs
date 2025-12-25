@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.Utils.MlLogTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Utils.MlLog
 
   setup do
@@ -25,16 +27,21 @@ defmodule TinkexCookbook.Utils.MlLogTest do
     test "logs config when provided", %{temp_dir: temp_dir} do
       config = %{learning_rate: 0.001, batch_size: 32}
 
-      logger = MlLog.setup_logging(temp_dir, config: config)
+      log =
+        capture_log(fn ->
+          logger = MlLog.setup_logging(temp_dir, config: config)
 
-      assert logger.logged_hparams? == true
-      assert File.exists?(logger.config_file)
+          assert logger.logged_hparams? == true
+          assert File.exists?(logger.config_file)
 
-      content = File.read!(logger.config_file)
-      decoded = Jason.decode!(content)
+          content = File.read!(logger.config_file)
+          decoded = Jason.decode!(content)
 
-      assert decoded["learning_rate"] == 0.001
-      assert decoded["batch_size"] == 32
+          assert decoded["learning_rate"] == 0.001
+          assert decoded["batch_size"] == 32
+        end)
+
+      assert log =~ "Logged config to"
     end
   end
 
@@ -42,8 +49,14 @@ defmodule TinkexCookbook.Utils.MlLogTest do
     test "appends metrics to JSONL file", %{temp_dir: temp_dir} do
       logger = MlLog.setup_logging(temp_dir)
 
-      MlLog.log_metrics(logger, %{loss: 0.5, accuracy: 0.9}, 1)
-      MlLog.log_metrics(logger, %{loss: 0.3, accuracy: 0.95}, 2)
+      log =
+        capture_log(fn ->
+          MlLog.log_metrics(logger, %{loss: 0.5, accuracy: 0.9}, 1)
+          MlLog.log_metrics(logger, %{loss: 0.3, accuracy: 0.95}, 2)
+        end)
+
+      assert log =~ "Step 1:"
+      assert log =~ "Step 2:"
 
       content = File.read!(logger.metrics_file)
       lines = String.split(content, "\n", trim: true)
@@ -63,7 +76,12 @@ defmodule TinkexCookbook.Utils.MlLogTest do
     test "handles metrics without step", %{temp_dir: temp_dir} do
       logger = MlLog.setup_logging(temp_dir)
 
-      MlLog.log_metrics(logger, %{final_loss: 0.1})
+      log =
+        capture_log(fn ->
+          MlLog.log_metrics(logger, %{final_loss: 0.1})
+        end)
+
+      assert log =~ "final_loss=0.1"
 
       content = File.read!(logger.metrics_file)
       decoded = Jason.decode!(String.trim(content))
@@ -77,12 +95,17 @@ defmodule TinkexCookbook.Utils.MlLogTest do
     test "only logs once", %{temp_dir: temp_dir} do
       logger = MlLog.setup_logging(temp_dir)
 
-      logger = MlLog.log_hparams(logger, %{lr: 0.01})
-      assert logger.logged_hparams? == true
+      log =
+        capture_log(fn ->
+          logger = MlLog.log_hparams(logger, %{lr: 0.01})
+          assert logger.logged_hparams? == true
 
-      # Second call should be no-op
-      logger = MlLog.log_hparams(logger, %{lr: 0.02})
-      assert logger.logged_hparams? == true
+          # Second call should be no-op
+          logger = MlLog.log_hparams(logger, %{lr: 0.02})
+          assert logger.logged_hparams? == true
+        end)
+
+      assert log =~ "Logged config to"
 
       # File should still have original value
       content = File.read!(logger.config_file)
@@ -96,7 +119,12 @@ defmodule TinkexCookbook.Utils.MlLogTest do
     test "returns :ok", %{temp_dir: temp_dir} do
       logger = MlLog.setup_logging(temp_dir)
 
-      assert MlLog.close(logger) == :ok
+      log =
+        capture_log(fn ->
+          assert MlLog.close(logger) == :ok
+        end)
+
+      assert log =~ "Closing logger for"
     end
   end
 

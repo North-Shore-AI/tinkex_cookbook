@@ -7,6 +7,8 @@ defmodule TinkexCookbook.Eval.RunnerTest do
   """
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Eval.Runner
   alias TinkexCookbook.Test.MockTinkex
 
@@ -31,29 +33,38 @@ defmodule TinkexCookbook.Eval.RunnerTest do
     end
 
     test "returns results for all samples", %{config: config, samples: samples} do
-      {:ok, results} = Runner.run(samples, config)
+      log =
+        capture_log(fn ->
+          {:ok, results} = Runner.run(samples, config)
+          assert length(results) == 2
+        end)
 
-      assert length(results) == 2
+      assert log =~ "Running evaluation on 2 samples"
+      assert log =~ "Evaluation complete"
     end
 
     test "each result has required fields", %{config: config, samples: samples} do
-      {:ok, results} = Runner.run(samples, config)
+      capture_log(fn ->
+        {:ok, results} = Runner.run(samples, config)
 
-      Enum.each(results, fn result ->
-        assert Map.has_key?(result, :id)
-        assert Map.has_key?(result, :input)
-        assert Map.has_key?(result, :output)
-        assert Map.has_key?(result, :target)
+        Enum.each(results, fn result ->
+          assert Map.has_key?(result, :id)
+          assert Map.has_key?(result, :input)
+          assert Map.has_key?(result, :output)
+          assert Map.has_key?(result, :target)
+        end)
       end)
     end
 
     test "preserves sample id in results", %{config: config, samples: samples} do
-      {:ok, results} = Runner.run(samples, config)
+      capture_log(fn ->
+        {:ok, results} = Runner.run(samples, config)
 
-      result_ids = Enum.map(results, & &1.id)
-      sample_ids = Enum.map(samples, & &1.id)
+        result_ids = Enum.map(results, & &1.id)
+        sample_ids = Enum.map(samples, & &1.id)
 
-      assert result_ids == sample_ids
+        assert result_ids == sample_ids
+      end)
     end
   end
 

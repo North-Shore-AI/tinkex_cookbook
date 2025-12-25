@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.Recipes.SlBasicTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Recipes.SlBasic
   alias TinkexCookbook.Supervised.Config
 
@@ -77,8 +79,14 @@ defmodule TinkexCookbook.Recipes.SlBasicTest do
       config = SlBasic.build_config(log_path: temp_dir)
       config = Config.expand_log_path(config)
 
-      result = SlBasic.run_training(config)
-      assert result == {:error, :missing_api_key}
+      log =
+        capture_log(fn ->
+          result = SlBasic.run_training(config)
+          assert result == {:error, :missing_api_key}
+        end)
+
+      assert log =~ "Starting sl_basic training"
+      assert log =~ "TINKER_API_KEY environment variable is required"
 
       # Restore original key if it existed
       if original_key, do: System.put_env("TINKER_API_KEY", original_key)

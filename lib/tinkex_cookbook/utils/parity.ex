@@ -168,13 +168,11 @@ defmodule TinkexCookbook.Utils.Parity do
     """
     @spec log_dataset_snapshot(list(), non_neg_integer(), String.t() | nil) :: :ok
     def log_dataset_snapshot(samples, n_samples \\ 10, id_key \\ nil) do
-      if Process.whereis(__MODULE__) && enabled?() do
-        Agent.update(__MODULE__, fn state ->
-          snapshot = build_dataset_snapshot(samples, n_samples, id_key)
-          write_artifact(state, "dataset_snapshot.json", snapshot)
-          %{state | dataset_snapshot: snapshot}
-        end)
-      end
+      safe_update(fn state ->
+        snapshot = build_dataset_snapshot(samples, n_samples, id_key)
+        write_artifact(state, "dataset_snapshot.json", snapshot)
+        %{state | dataset_snapshot: snapshot}
+      end)
 
       :ok
     end
@@ -190,21 +188,19 @@ defmodule TinkexCookbook.Utils.Parity do
             String.t() | nil
           ) :: :ok
     def log_rendered_sample(sample_index, messages, model_input, weights, prompt_text \\ nil) do
-      if Process.whereis(__MODULE__) && enabled?() do
-        Agent.update(__MODULE__, fn state ->
-          rendered =
-            build_rendered_sample(sample_index, messages, model_input, weights, prompt_text)
+      safe_update(fn state ->
+        rendered =
+          build_rendered_sample(sample_index, messages, model_input, weights, prompt_text)
 
-          new_samples = state.rendered_samples ++ [rendered]
+        new_samples = state.rendered_samples ++ [rendered]
 
-          # Write after collecting a few samples
-          if length(new_samples) >= 10 do
-            flush_rendered_samples(state, new_samples)
-          end
+        # Write after collecting a few samples
+        if length(new_samples) >= 10 do
+          flush_rendered_samples(state, new_samples)
+        end
 
-          %{state | rendered_samples: new_samples}
-        end)
-      end
+        %{state | rendered_samples: new_samples}
+      end)
 
       :ok
     end
@@ -214,18 +210,16 @@ defmodule TinkexCookbook.Utils.Parity do
     """
     @spec log_first_batch_payload(list(Datum.t())) :: :ok
     def log_first_batch_payload(batch) do
-      if Process.whereis(__MODULE__) && enabled?() do
-        Agent.update(__MODULE__, fn state ->
-          # Only log the first batch
-          if state.first_batch_payload == nil do
-            payload = build_batch_payload(batch)
-            write_artifact(state, "first_batch_payload.json", payload)
-            %{state | first_batch_payload: payload}
-          else
-            state
-          end
-        end)
-      end
+      safe_update(fn state ->
+        # Only log the first batch
+        if state.first_batch_payload == nil do
+          payload = build_batch_payload(batch)
+          write_artifact(state, "first_batch_payload.json", payload)
+          %{state | first_batch_payload: payload}
+        else
+          state
+        end
+      end)
 
       :ok
     end
@@ -235,11 +229,9 @@ defmodule TinkexCookbook.Utils.Parity do
     """
     @spec log_checkpoint_paths(list(String.t())) :: :ok
     def log_checkpoint_paths(paths) do
-      if Process.whereis(__MODULE__) && enabled?() do
-        Agent.get(__MODULE__, fn state ->
-          write_artifact(state, "checkpoint_paths.json", %{paths: paths})
-        end)
-      end
+      safe_get(fn state ->
+        write_artifact(state, "checkpoint_paths.json", %{paths: paths})
+      end)
 
       :ok
     end
@@ -249,11 +241,9 @@ defmodule TinkexCookbook.Utils.Parity do
     """
     @spec log_final_weights_path(String.t()) :: :ok
     def log_final_weights_path(path) do
-      if Process.whereis(__MODULE__) && enabled?() do
-        Agent.get(__MODULE__, fn state ->
-          write_artifact(state, "final_weights_path.json", %{path: path})
-        end)
-      end
+      safe_get(fn state ->
+        write_artifact(state, "final_weights_path.json", %{path: path})
+      end)
 
       :ok
     end
@@ -263,12 +253,10 @@ defmodule TinkexCookbook.Utils.Parity do
     """
     @spec flush() :: :ok
     def flush do
-      if Process.whereis(__MODULE__) && enabled?() do
-        Agent.update(__MODULE__, fn state ->
-          flush_rendered_samples(state, state.rendered_samples)
-          state
-        end)
-      end
+      safe_update(fn state ->
+        flush_rendered_samples(state, state.rendered_samples)
+        state
+      end)
 
       :ok
     end
@@ -279,9 +267,35 @@ defmodule TinkexCookbook.Utils.Parity do
     @spec enabled?() :: boolean()
     def enabled? do
       if Process.whereis(__MODULE__) do
-        Agent.get(__MODULE__, & &1.enabled)
+        # Handle race condition where process may be stopped between check and call
+        try do
+          Agent.get(__MODULE__, & &1.enabled)
+        catch
+          :exit, _ -> false
+        end
       else
         false
+      end
+    end
+
+    # Safe Agent operations that handle race conditions
+    defp safe_update(fun) do
+      if Process.whereis(__MODULE__) && enabled?() do
+        try do
+          Agent.update(__MODULE__, fun)
+        catch
+          :exit, _ -> :ok
+        end
+      end
+    end
+
+    defp safe_get(fun) do
+      if Process.whereis(__MODULE__) && enabled?() do
+        try do
+          Agent.get(__MODULE__, fun)
+        catch
+          :exit, _ -> nil
+        end
       end
     end
 

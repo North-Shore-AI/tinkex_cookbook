@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.Supervised.CommonTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Supervised.Common
   alias TinkexCookbook.Types.{EncodedTextChunk, ImageChunk, ModelInput, TensorData}
 
@@ -99,9 +101,13 @@ defmodule TinkexCookbook.Supervised.CommonTest do
       logprobs = [TensorData.from_list([-1.0, -2.0], :float32)]
       weights = [TensorData.from_list([0.0, 0.0], :float32)]
 
-      nll = Common.compute_mean_nll(logprobs, weights)
+      log =
+        capture_log(fn ->
+          nll = Common.compute_mean_nll(logprobs, weights)
+          assert nll == :nan
+        end)
 
-      assert nll == :nan
+      assert log =~ "No valid weights found for NLL computation"
     end
 
     test "handles multiple batches" do

@@ -109,6 +109,11 @@ defmodule TinkexCookbook.Renderers.Llama3 do
   def render_message(_idx, message, _is_last, %{tokenizer: tokenizer} = state) do
     role = message.role
 
+    # Llama3 does not support thinking/CoT tokens
+    if message.thinking != nil do
+      raise ArgumentError, "CoT tokens not supported in Llama3"
+    end
+
     unless is_binary(message.content) do
       raise ArgumentError, "Llama3Renderer only supports message with string content"
     end

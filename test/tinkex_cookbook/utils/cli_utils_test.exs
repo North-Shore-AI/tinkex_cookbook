@@ -1,6 +1,8 @@
 defmodule TinkexCookbook.Utils.CliUtilsTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias TinkexCookbook.Utils.CliUtils
 
   describe "check_log_dir/2" do
@@ -10,7 +12,13 @@ defmodule TinkexCookbook.Utils.CliUtilsTest do
       # Ensure it doesn't exist
       File.rm_rf(temp_dir)
 
-      assert CliUtils.check_log_dir(temp_dir, :delete) == :ok
+      log =
+        capture_log(fn ->
+          assert CliUtils.check_log_dir(temp_dir, :delete) == :ok
+        end)
+
+      assert log =~ "does not exist"
+      assert log =~ "Will create it"
     end
 
     test "deletes existing directory with :delete behavior" do
@@ -20,8 +28,14 @@ defmodule TinkexCookbook.Utils.CliUtilsTest do
       File.mkdir_p!(temp_dir)
       File.write!(Path.join(temp_dir, "test.txt"), "test")
 
-      assert CliUtils.check_log_dir(temp_dir, :delete) == :ok
+      log =
+        capture_log(fn ->
+          assert CliUtils.check_log_dir(temp_dir, :delete) == :ok
+        end)
+
       refute File.exists?(temp_dir)
+      assert log =~ "already exists"
+      assert log =~ "Will delete it"
     end
 
     test "returns :resume for existing directory with :resume behavior" do
@@ -30,7 +44,13 @@ defmodule TinkexCookbook.Utils.CliUtilsTest do
       # Create the directory
       File.mkdir_p!(temp_dir)
 
-      assert CliUtils.check_log_dir(temp_dir, :resume) == :resume
+      log =
+        capture_log(fn ->
+          assert CliUtils.check_log_dir(temp_dir, :resume) == :resume
+        end)
+
+      assert log =~ "exists"
+      assert log =~ "Resuming from last checkpoint"
 
       # Cleanup
       File.rm_rf(temp_dir)
