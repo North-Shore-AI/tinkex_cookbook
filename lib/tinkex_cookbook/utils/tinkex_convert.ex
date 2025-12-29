@@ -3,8 +3,8 @@ defmodule TinkexCookbook.Utils.TinkexConvert do
   Helpers to convert TinkexCookbook types into Tinkex SDK types.
   """
 
+  alias CrucibleTrain.Types, as: CookbookTypes
   alias Tinkex.Types.{EncodedTextChunk, ImageChunk, ModelInput, TensorData}
-  alias TinkexCookbook.Types, as: CookbookTypes
 
   @spec model_input_to_tinkex(CookbookTypes.ModelInput.t()) :: ModelInput.t()
   def model_input_to_tinkex(%CookbookTypes.ModelInput{chunks: chunks}) do

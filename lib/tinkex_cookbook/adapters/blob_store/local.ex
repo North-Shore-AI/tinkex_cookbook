@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.BlobStore.Local do
   Local filesystem adapter for BlobStore.
   """
 
-  @behaviour TinkexCookbook.Ports.BlobStore
+  @behaviour CrucibleTrain.Ports.BlobStore
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def read(_opts, path) do

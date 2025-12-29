@@ -2,6 +2,10 @@
 
 **Purpose:** keep external services swappable and testable without touching recipe logic.
 
+> NOTE: This document predates the corrected ownership model. Adapter
+> implementations now live in `crucible_kitchen`; TinkexCookbook provides
+> recipes/config only. The examples below are historical.
+
 This repo uses a lightweight Ports & Adapters design:
 
 - **Ports** define the cookbook-facing interfaces (behaviours).

@@ -4,6 +4,9 @@
 
 This document details how Snakepit (the Elixir-Python gRPC bridge) integrates with TinkexCookbook recipes for accessing Python libraries like sympy, pylatexenc, and math_verify.
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only.
+
 ---
 
 ## Integration Principle

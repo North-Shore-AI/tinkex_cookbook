@@ -4,6 +4,10 @@ Date: 2025-12-26
 Status: Draft
 Owner: North-Shore-AI
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only. The
+examples below are retained for historical context.
+
 ## 1) Purpose
 
 Define how `tinkex_cookbook` implements adapters for Crucible ports and how the facade wires them. All external integrations must go through ports.

@@ -4,6 +4,9 @@
 
 This document catalogs all North-Shore-AI ecosystem libraries required for the thin facade, their roles, and integration points.
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; references to tinkex_cookbook adapters are historical.
+
 ---
 
 ## Core Dependencies (Required)

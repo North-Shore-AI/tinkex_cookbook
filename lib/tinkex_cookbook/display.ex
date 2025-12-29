@@ -3,7 +3,7 @@ defmodule TinkexCookbook.Display do
   Display helpers for colorized output and trajectory formatting.
   """
 
-  alias TinkexCookbook.Types.{Datum, EncodedTextChunk, ImageChunk, ModelInput, TensorData}
+  alias CrucibleTrain.Types.{Datum, EncodedTextChunk, ImageChunk, ModelInput, TensorData}
   alias TinkexCookbook.Utils.FormatColorized
 
   @spec colorize_example(Datum.t(), module() | map(), String.t()) :: String.t()

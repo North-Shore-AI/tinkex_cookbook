@@ -1,9 +1,9 @@
 defmodule TinkexCookbook.DisplayTest do
   use ExUnit.Case, async: true
 
+  alias CrucibleTrain.Types.{Datum, ModelInput, TensorData}
   alias TinkexCookbook.Display
   alias TinkexCookbook.Test.MockTokenizer
-  alias TinkexCookbook.Types.{Datum, ModelInput, TensorData}
 
   test "colorize_example returns formatted output" do
     model_input = ModelInput.from_ints(MockTokenizer.encode("Hi"))

@@ -48,8 +48,8 @@ defmodule TinkexCookbook.Eval.Runner do
 
   require Logger
 
+  alias CrucibleTrain.Renderers.Types
   alias TinkexCookbook.Eval.TinkexGenerate
-  alias TinkexCookbook.Renderers.Types
 
   @type sample :: %{
           required(:id) => String.t(),

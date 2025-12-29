@@ -4,6 +4,9 @@ Date: 2025-12-26
 Status: Draft
 Owner: North-Shore-AI
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only.
+
 ## 1) Purpose
 
 Define a unified facade for a ground-up rewrite of `tinkex_cookbook` so recipes consume a single stable API while all training infrastructure lives in the Crucible ecosystem. The facade hides internal complexity but preserves the layered architecture.

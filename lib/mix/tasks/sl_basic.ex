@@ -62,6 +62,34 @@ defmodule Mix.Tasks.SlBasic do
     Mix.Task.run("app.start")
 
     # Delegate to the recipe's main function
-    SlBasic.main(args)
+    case SlBasic.main(args) do
+      :ok ->
+        Mix.shell().info("Training completed successfully!")
+
+      {:error, {:missing_env, var}} ->
+        Mix.shell().error("Missing environment variable: #{var}")
+        Mix.shell().error("Set it with: export #{var}=your_value")
+        exit({:shutdown, 1})
+
+      {:error, {:tokenizer_failed, %{message: msg}}} ->
+        Mix.shell().error("Tokenizer download failed: #{msg}")
+        Mix.shell().error("")
+        Mix.shell().error("This usually means HuggingFace authentication is required.")
+        Mix.shell().error("Set your token: export HUGGING_FACE_HUB_TOKEN=hf_your_token")
+        exit({:shutdown, 1})
+
+      {:error, {:training_client_failed, %{message: msg, data: data}}} ->
+        Mix.shell().error("Training client failed: #{msg}")
+        if data, do: Mix.shell().error("Details: #{inspect(data)}")
+        exit({:shutdown, 1})
+
+      {:error, {:dataset_load_failed, reason}} ->
+        Mix.shell().error("Dataset loading failed: #{inspect(reason)}")
+        exit({:shutdown, 1})
+
+      {:error, reason} ->
+        Mix.shell().error("Training failed: #{inspect(reason)}")
+        exit({:shutdown, 1})
+    end
   end
 end

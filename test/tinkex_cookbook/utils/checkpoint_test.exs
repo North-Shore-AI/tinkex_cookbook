@@ -1,7 +1,11 @@
 defmodule TinkexCookbook.Utils.CheckpointTest do
-  use ExUnit.Case, async: true
+  # async: false because tests need to capture Logger output which requires
+  # changing the global Logger level
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
+
+  require Logger
 
   alias TinkexCookbook.Utils.Checkpoint
 
@@ -23,6 +27,16 @@ defmodule TinkexCookbook.Utils.CheckpointTest do
 
     File.rm_rf!(tmp_dir)
     File.mkdir_p!(tmp_dir)
+
+    # Save original logger level and set to :info for these tests
+    original_level = Logger.level()
+    Logger.configure(level: :info)
+
+    on_exit(fn ->
+      Logger.configure(level: original_level)
+      File.rm_rf(tmp_dir)
+    end)
+
     %{tmp_dir: tmp_dir}
   end
 

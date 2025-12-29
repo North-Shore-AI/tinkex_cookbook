@@ -4,167 +4,150 @@
   <img src="assets/tinkex_cookbook.svg" alt="TinkexCookbook Logo" width="200">
 </p>
 
-Elixir port of `tinker-cookbook`: training and evaluation recipes for the Tinker ML platform.
+Elixir port of `tinker-cookbook`: training recipes for the Tinker ML platform, powered by CrucibleKitchen.
 
-## Status: Phase 1 Complete, Phase 2 Part 1 Infrastructure Complete
+## Overview
 
-Phase 1 delivers a working foundation for supervised learning with the `sl_basic` recipe. Phase 2 Part 1 adds the shared infrastructure needed for RL, preference/DPO, and distillation recipes.
+TinkexCookbook provides ready-to-use training recipes for fine-tuning large language models on the Tinker ML platform. It is built on top of the CrucibleKitchen orchestration engine, providing:
 
-### Completed Features
+- Pre-built recipes for supervised learning, RL, and DPO training
+- Integration with HuggingFace datasets and model hub
+- Automatic dataset rendering with Llama3, Qwen3, DeepSeek, and other tokenizers
+- Full telemetry and checkpoint management
 
-- **Renderers**: Llama3 + Qwen3/DeepSeek/KimiK2/GptOss/RoleColon (tool calling framework included)
-- **Datasets**: NoRobots + preference/DPO and distillation dataset builders
-- **Training Loops**: Supervised + RL (sync/async) + DPO + on-policy distillation
-- **Completers + Checkpointing**: Token/message completers and checkpoint utilities
-- **Eval + Utilities**: TinkexGenerate, Eval runner, logtree/trace/display helpers
+## Prerequisites
 
-### Quality Gates (Phase 1 baseline, 2025-12-24)
-
-- 174 tests passing
-- Zero compiler warnings
-- Credo strict: clean
-- Dialyzer: no type errors
-
-### Phase 2 Part 1 Decisions (2025-12-24)
-
-- **VL renderers deferred:** Qwen3VL/Qwen3VLInstruct move to Phase 3; Phase 2 recipes should avoid VL models.
-- **Tool calling framework:** Implement shared tool-call encode/decode utilities and reuse them across renderers.
-- **Sync + async RL together:** Build sync and async RL training paths in the same pass with shared core abstractions.
-
-See `docs/20251224/phase2_prerequisites/PHASE2_PART1_INFRASTRUCTURE.md` for the updated infrastructure plan.
+- Elixir 1.18 or later
+- A Tinker API key (set as `TINKER_API_KEY` environment variable)
+- Optional: HuggingFace token for gated models (`HUGGING_FACE_HUB_TOKEN`)
 
 ## Installation
 
-Add `tinkex_cookbook` to your list of dependencies in `mix.exs`:
+Add `tinkex_cookbook` to your dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:tinkex_cookbook, "~> 0.3.1"}
+    {:tinkex_cookbook, "~> 0.4.0"}
   ]
 end
 ```
 
-## Quick Start
-
-### Running sl_basic Recipe
+Then fetch dependencies:
 
 ```bash
-# Set your API key
-export TINKER_API_KEY=your_key_here
+mix deps.get
+```
 
-# Basic run with defaults
+## Quick Start
+
+### 1. Set Your API Key
+
+```bash
+export TINKER_API_KEY=your_api_key_here
+```
+
+### 2. Run the Supervised Learning Recipe
+
+```bash
+# Basic run with defaults (Llama-3.1-8B, NoRobots dataset)
 mix sl_basic
 
-# With custom options
-mix sl_basic log_path=/tmp/my_run learning_rate=0.0002 num_epochs=2
+# With custom parameters
+mix sl_basic model_name=meta-llama/Llama-3.1-8B learning_rate=0.0002 num_epochs=2
 
-# Limit samples for quick testing
+# Quick test with limited samples
 mix sl_basic n_train_samples=100 batch_size=32
+```
 
-# See all available options
+### 3. View Available Options
+
+```bash
 mix help sl_basic
 ```
 
-Available options:
-- `log_path` - Output directory (default: `/tmp/tinkex-examples/sl_basic`)
-- `model_name` - Model to fine-tune (default: `meta-llama/Llama-3.1-8B`)
-- `learning_rate` - Learning rate (default: `0.0002`)
-- `num_epochs` - Training epochs (default: `1`)
-- `batch_size` - Batch size (default: `128`)
-- `max_length` - Max sequence length (default: `32768`)
-- `lora_rank` - LoRA rank (default: `32`)
-- `n_train_samples` - Limit training samples (default: all)
+## Configuration Options
 
-### Programmatic Usage
+| Option | Description | Default |
+|--------|-------------|---------|
+| `model_name` | Model to fine-tune | `meta-llama/Llama-3.1-8B` |
+| `learning_rate` | Learning rate | `0.0002` |
+| `lr_schedule` | Schedule: `linear`, `constant`, `cosine` | `linear` |
+| `num_epochs` | Number of training epochs | `1` |
+| `batch_size` | Batch size | `128` |
+| `max_length` | Maximum sequence length | `32768` |
+| `lora_rank` | LoRA rank | `32` |
+| `n_train_samples` | Limit training samples | all |
+| `save_every` | Save checkpoint every N steps | `20` |
+| `log_path` | Output directory | `/tmp/tinkex-examples/sl_basic` |
+
+## Programmatic Usage
+
+### Using CrucibleKitchen (Recommended)
 
 ```elixir
-# Build configuration
-config = TinkexCookbook.Recipes.SlBasic.build_config(
-  model_name: "meta-llama/Llama-3.1-8B",
-  learning_rate: 2.0e-4,
-  num_epochs: 1
-)
+# Run with the V2 recipe using CrucibleKitchen
+TinkexCookbook.Recipes.SlBasicV2.run(%{
+  model: "meta-llama/Llama-3.1-8B",
+  dataset: :no_robots,
+  epochs: 2,
+  learning_rate: 2.0e-4
+})
+```
 
-# Run training
+### Direct Recipe Execution
+
+```elixir
+# Using the original recipe implementation
+config = %{
+  model: "meta-llama/Llama-3.1-8B",
+  num_epochs: 1,
+  batch_size: 128
+}
+
 TinkexCookbook.Recipes.SlBasic.run_training(config)
 ```
 
-### Using the Llama3 Renderer
+### Adapter Configuration
 
 ```elixir
-alias TinkexCookbook.Renderers.{Llama3, Renderer, TrainOnWhat, Types}
-
-# Initialize renderer with tokenizer
-{:ok, state} = Llama3.init(tokenizer: MyTokenizer)
-
-# Build supervised training example
-messages = [
-  Types.message("user", "What is 2+2?"),
-  Types.message("assistant", "The answer is 4.")
-]
-
-{model_input, weights} = Renderer.build_supervised_example(
-  Llama3,
-  messages,
-  TrainOnWhat.all_assistant_messages(),
-  state
-)
-```
-
-### Running Evaluations
-
-```elixir
-alias TinkexCookbook.Eval.Runner
-
-# Setup config with sampling client
-config = %{
-  sampling_client: sampling_client,
-  model: "meta-llama/Llama-3.1-8B",
-  temperature: 0.7,
-  max_tokens: 1024,
-  stop: ["<|eot_id|>"]
+# Provide adapters from crucible_kitchen
+adapters = %{
+  training_client: {CrucibleKitchen.Adapters.Tinkex.TrainingClient,
+    api_key: "custom_key",
+    base_url: "https://custom-endpoint.example.com"
+  },
+  dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []}
 }
 
-# Define samples
-samples = [
-  %{id: "1", input: "What is 2+2?", target: "4"},
-  %{id: "2", input: "What is 3+3?", target: "6"}
-]
-
-# Run evaluation
-{:ok, results} = Runner.run(samples, config)
-
-# Score and compute metrics
-scored = Runner.score_results(results, :exact_match)
-metrics = Runner.compute_metrics(scored)
-# => %{accuracy: 0.5, total: 2, correct: 1}
+CrucibleKitchen.run(TinkexCookbook.Recipes.SlBasicV2, config, adapters: adapters)
 ```
 
-## Dependencies
+## Environment Variables
 
-Core dependencies for Phase 1:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TINKER_API_KEY` | Yes | Your Tinker platform API key |
+| `TINKER_BASE_URL` | No | Custom Tinker API endpoint |
+| `HUGGING_FACE_HUB_TOKEN` | No | HuggingFace token for gated models/datasets |
 
-```elixir
-{:tinkex, "~> 0.3.2"}           # Tinker API client
-{:chz_ex, "~> 0.1.2"}           # Configuration + CLI
-{:hf_datasets_ex, "~> 0.1"}     # HuggingFace datasets
-{:crucible_harness, "~> 0.3.1"} # Evaluation framework
-{:eval_ex, "~> 0.1.1"}          # Evaluation tasks
-{:crucible_datasets, "~> 0.5.1"} # Dataset operations
-{:nx, "~> 0.9"}                 # Tensor operations
-```
+## Available Recipes
 
-## Documentation
+| Recipe | Description | Mix Task |
+|--------|-------------|----------|
+| `SlBasic` | Supervised fine-tuning with NoRobots | `mix sl_basic` |
+| `SlBasicV2` | CrucibleKitchen-based supervised training | Programmatic only |
 
-- [AGENTS.md](AGENTS.md) - Agent guide for porting Python to Elixir
-- [docs/](docs/) - Architecture and planning documents
+## Supported Models
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc):
+Renderers are provided by `crucible_train`:
 
-```bash
-mix docs
-```
+- **Llama 3.x** family (Llama-3.1-8B, Llama-3.2-3B, etc.)
+- **Qwen 3.x** family
+- **DeepSeek V3**
+- **Generic role-colon format** (fallback)
+
+Renderers handle proper tokenization, special tokens, and training weight computation for each model family.
 
 ## Development
 
@@ -172,7 +155,7 @@ mix docs
 # Setup
 mix deps.get && mix compile
 
-# Tests
+# Run tests
 mix test
 
 # Code quality
@@ -180,6 +163,33 @@ mix format
 mix credo --strict
 mix dialyzer
 ```
+
+## Documentation
+
+For internal architecture details, see:
+
+- [Internal Architecture Guide](docs/guides/internal_architecture.md) - CrucibleKitchen integration, adapters, and workflows
+- [DEVELOPERS.md](docs/DEVELOPERS.md) - Development guidelines
+
+Generate API documentation:
+
+```bash
+mix docs
+open doc/index.html
+```
+
+## Related Projects
+
+TinkexCookbook is part of the North-Shore-AI ecosystem:
+
+| Project | Purpose |
+|---------|---------|
+| `crucible_kitchen` | Backend-agnostic training orchestration |
+| `crucible_train` | Training types, renderers, and dataset utilities |
+| `crucible_ir` | Experiment intermediate representation |
+| `tinkex` | Elixir client for Tinker API |
+| `hf_datasets_ex` | HuggingFace datasets client |
+| `hf_hub_ex` | HuggingFace Hub client |
 
 ## License
 

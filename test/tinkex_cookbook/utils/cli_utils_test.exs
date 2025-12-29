@@ -1,9 +1,25 @@
 defmodule TinkexCookbook.Utils.CliUtilsTest do
-  use ExUnit.Case, async: true
+  # async: false because tests need to capture Logger output which requires
+  # changing the global Logger level
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 
+  require Logger
+
   alias TinkexCookbook.Utils.CliUtils
+
+  setup do
+    # Save original logger level and set to :info for these tests
+    original_level = Logger.level()
+    Logger.configure(level: :info)
+
+    on_exit(fn ->
+      Logger.configure(level: original_level)
+    end)
+
+    :ok
+  end
 
   describe "check_log_dir/2" do
     test "returns :ok for non-existent directory" do

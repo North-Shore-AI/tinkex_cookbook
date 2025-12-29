@@ -5,7 +5,7 @@ defmodule TinkexCookbook.Recipes.SlBasic.CliConfig do
 
   use ChzEx.Schema
 
-  alias TinkexCookbook.Renderers.TrainOnWhat
+  alias CrucibleTrain.Renderers.TrainOnWhat
 
   chz_schema do
     field(:log_path, :string, default: "/tmp/tinkex-examples/sl_basic")

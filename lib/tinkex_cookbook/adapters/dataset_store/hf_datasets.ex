@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.DatasetStore.HfDatasets do
   Adapter for HfDatasetsEx dataset operations.
   """
 
-  @behaviour TinkexCookbook.Ports.DatasetStore
+  @behaviour CrucibleTrain.Ports.DatasetStore
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def load_dataset(_opts, repo_id, opts) do

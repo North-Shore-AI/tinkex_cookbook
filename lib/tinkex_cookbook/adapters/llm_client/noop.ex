@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.LLMClient.Noop do
   No-op adapter for LLM inference.
   """
 
-  @behaviour TinkexCookbook.Ports.LLMClient
+  @behaviour CrucibleTrain.Ports.LLMClient
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def chat(_opts, _messages, _opts2) do

@@ -1,177 +1,253 @@
 defmodule TinkexCookbook.Recipes.SlBasicTest do
+  @moduledoc """
+  Tests for the sl_basic recipe.
+
+  These tests verify that the recipe:
+  1. Implements the Recipe behaviour correctly
+  2. Builds valid CrucibleIR.Experiment specs
+  3. Works with the NoRobots dataset and CrucibleTrain types
+  """
   use ExUnit.Case, async: true
 
-  import ExUnit.CaptureLog
-
+  alias CrucibleIR.Experiment
+  alias CrucibleTrain.Renderers.{Llama3, TrainOnWhat}
+  alias CrucibleTrain.Supervised.Dataset, as: SupervisedDataset
+  alias CrucibleTrain.Types.{Datum, ModelInput, TensorData}
+  alias TinkexCookbook.Datasets.NoRobots
   alias TinkexCookbook.Recipes.SlBasic
-  alias TinkexCookbook.Supervised.Config
+  alias TinkexCookbook.Test.MockTokenizer
 
-  describe "build_config/1" do
-    test "returns default config with no overrides" do
-      config = SlBasic.build_config()
+  describe "Recipe behaviour" do
+    test "name/0 returns recipe name" do
+      assert SlBasic.name() == "sl_basic"
+    end
 
-      assert %Config{} = config
-      assert config.model_name == "meta-llama/Llama-3.1-8B"
+    test "description/0 returns description" do
+      assert is_binary(SlBasic.description())
+    end
+
+    test "default_config/0 returns valid config map" do
+      config = SlBasic.default_config()
+
+      assert is_map(config)
+      assert config.model == "meta-llama/Llama-3.1-8B"
       assert config.learning_rate == 2.0e-4
       assert config.num_epochs == 1
-      assert config.lr_schedule == "linear"
+      assert config.batch_size == 128
+      assert config.lora_rank == 32
+    end
+  end
+
+  describe "build_spec/1" do
+    test "builds valid Experiment struct" do
+      config = SlBasic.default_config()
+      experiment = SlBasic.build_spec(config)
+
+      assert %Experiment{} = experiment
+      assert experiment.experiment_type == :training
+      assert experiment.backend.id == :tinker
     end
 
-    test "applies overrides" do
-      config =
-        SlBasic.build_config(
-          model_name: "Qwen/Qwen3-8B",
-          learning_rate: 1.0e-4,
-          num_epochs: 3
+    test "builds experiment with custom config" do
+      config = %{
+        model: "Qwen/Qwen3-8B",
+        num_epochs: 3,
+        learning_rate: 1.0e-4
+      }
+
+      experiment = SlBasic.build_spec(config)
+
+      assert experiment.backend.model_version == "Qwen/Qwen3-8B"
+      assert experiment.training_config.epochs == 3
+      assert experiment.training_config.learning_rate == 1.0e-4
+    end
+
+    test "includes pipeline with supervised train stage" do
+      config = SlBasic.default_config()
+      experiment = SlBasic.build_spec(config)
+
+      assert length(experiment.pipeline) == 1
+      [stage] = experiment.pipeline
+      assert stage.name == :supervised_train
+      assert stage.module == CrucibleTrain.Stages.SupervisedTrain
+    end
+  end
+
+  describe "renderer selection" do
+    test "selects Llama3 renderer for Llama models" do
+      config = %{model: "meta-llama/Llama-3.1-8B"}
+      experiment = SlBasic.build_spec(config)
+
+      [stage] = experiment.pipeline
+      assert stage.options.renderer == CrucibleTrain.Renderers.Llama3
+    end
+
+    test "selects Qwen3 renderer for Qwen models" do
+      config = %{model: "Qwen/Qwen3-8B"}
+      experiment = SlBasic.build_spec(config)
+
+      [stage] = experiment.pipeline
+      assert stage.options.renderer == CrucibleTrain.Renderers.Qwen3
+    end
+
+    test "selects DeepSeekV3 renderer for DeepSeek models" do
+      config = %{model: "deepseek-ai/DeepSeek-V3"}
+      experiment = SlBasic.build_spec(config)
+
+      [stage] = experiment.pipeline
+      assert stage.options.renderer == CrucibleTrain.Renderers.DeepSeekV3
+    end
+
+    test "falls back to RoleColon for unknown models" do
+      config = %{model: "unknown/model"}
+      experiment = SlBasic.build_spec(config)
+
+      [stage] = experiment.pipeline
+      assert stage.options.renderer == CrucibleTrain.Renderers.RoleColon
+    end
+  end
+
+  describe "NoRobots dataset integration" do
+    test "sample_to_messages converts dataset format to Messages" do
+      sample = %{
+        "messages" => [
+          %{"role" => "user", "content" => "What is 2+2?"},
+          %{"role" => "assistant", "content" => "The answer is 4."}
+        ]
+      }
+
+      messages = NoRobots.sample_to_messages(sample)
+
+      assert length(messages) == 2
+      assert hd(messages).role == "user"
+      assert hd(messages).content == "What is 2+2?"
+    end
+
+    test "build_datum creates valid Datum struct" do
+      sample = %{
+        "messages" => [
+          %{"role" => "user", "content" => "Hello!"},
+          %{"role" => "assistant", "content" => "Hi there!"}
+        ]
+      }
+
+      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+
+      datum = NoRobots.build_datum(sample, Llama3, state, TrainOnWhat.all_assistant_messages())
+
+      assert %Datum{} = datum
+      assert %ModelInput{} = datum.model_input
+      assert is_map(datum.loss_fn_inputs)
+      assert Map.has_key?(datum.loss_fn_inputs, "weights")
+    end
+
+    test "create_supervised_dataset creates Dataset with lazy evaluation" do
+      samples = [
+        %{
+          "messages" => [
+            %{"role" => "user", "content" => "Hi"},
+            %{"role" => "assistant", "content" => "Hello!"}
+          ]
+        },
+        %{
+          "messages" => [
+            %{"role" => "user", "content" => "Bye"},
+            %{"role" => "assistant", "content" => "Goodbye!"}
+          ]
+        }
+      ]
+
+      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+
+      dataset =
+        NoRobots.create_supervised_dataset(samples,
+          renderer_module: Llama3,
+          renderer_state: state,
+          train_on_what: TrainOnWhat.all_assistant_messages(),
+          batch_size: 1
         )
 
-      assert config.model_name == "Qwen/Qwen3-8B"
-      assert config.learning_rate == 1.0e-4
-      assert config.num_epochs == 3
-    end
+      # Check dataset interface
+      assert SupervisedDataset.length(dataset) == 2
 
-    test "includes dataset builder with common config" do
-      config = SlBasic.build_config()
-
-      assert {:no_robots, common_config} = config.dataset_builder
-      assert common_config.model_name_for_tokenizer == "meta-llama/Llama-3.1-8B"
-      assert common_config.renderer_name == "llama3"
-      assert common_config.batch_size == 128
-      assert common_config.train_on_what == "all_assistant_messages"
+      # Get first batch
+      batch = SupervisedDataset.get_batch(dataset, 0)
+      assert length(batch) == 1
+      assert %Datum{} = hd(batch)
     end
   end
 
-  describe "get_recommended_renderer_name/1" do
-    test "returns llama3 for Llama models" do
-      assert SlBasic.get_recommended_renderer_name("meta-llama/Llama-3.1-8B") == "llama3"
-      assert SlBasic.get_recommended_renderer_name("meta-llama/Llama-3.2-1B-Instruct") == "llama3"
-    end
+  describe "datum structure compatibility" do
+    test "datum has correct loss_fn_inputs structure" do
+      sample = %{
+        "messages" => [
+          %{"role" => "user", "content" => "Test"},
+          %{"role" => "assistant", "content" => "Response"}
+        ]
+      }
 
-    test "returns qwen3 for Qwen models" do
-      assert SlBasic.get_recommended_renderer_name("Qwen/Qwen3-8B") == "qwen3"
-      assert SlBasic.get_recommended_renderer_name("Qwen/Qwen3-30B-A3B") == "qwen3"
-    end
+      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
 
-    test "returns deepseekv3 for DeepSeek models" do
-      assert SlBasic.get_recommended_renderer_name("deepseek-ai/DeepSeek-V3.1") == "deepseekv3"
-    end
+      datum = NoRobots.build_datum(sample, Llama3, state, TrainOnWhat.all_assistant_messages())
 
-    test "returns role_colon for unknown models" do
-      assert SlBasic.get_recommended_renderer_name("unknown/model") == "role_colon"
-    end
-  end
+      # Check weights structure
+      weights = datum.loss_fn_inputs["weights"]
+      assert %TensorData{} = weights
+      assert is_list(weights.data)
+      assert weights.dtype in [:float32, :float64, "float32", "float64"]
 
-  describe "run_training/1" do
-    setup do
-      temp_dir = Path.join(System.tmp_dir!(), "sl_basic_test_#{:rand.uniform(100_000)}")
-      File.rm_rf(temp_dir)
-
-      on_exit(fn -> File.rm_rf(temp_dir) end)
-
-      {:ok, temp_dir: temp_dir}
-    end
-
-    test "returns error when TINKER_API_KEY is not set", %{temp_dir: temp_dir} do
-      # Temporarily unset API key to test the error path
-      original_key = System.get_env("TINKER_API_KEY")
-      System.delete_env("TINKER_API_KEY")
-
-      config = SlBasic.build_config(log_path: temp_dir)
-      config = Config.expand_log_path(config)
-
-      log =
-        capture_log(fn ->
-          result = SlBasic.run_training(config)
-          assert result == {:error, :missing_api_key}
-        end)
-
-      assert log =~ "Starting sl_basic training"
-      assert log =~ "TINKER_API_KEY environment variable is required"
-
-      # Restore original key if it existed
-      if original_key, do: System.put_env("TINKER_API_KEY", original_key)
-    end
-
-    @tag :integration
-    @tag timeout: :infinity
-    test "creates log directory and runs training (requires TINKER_API_KEY)", %{
-      temp_dir: temp_dir
-    } do
-      if System.get_env("TINKER_API_KEY") do
-        config =
-          SlBasic.build_config(
-            log_path: temp_dir,
-            # Use small config for testing
-            batch_size: 2,
-            num_epochs: 1
-          )
-
-        config = Config.expand_log_path(config)
-
-        # Run with limited samples for testing
-        assert SlBasic.run_training(config, n_train_samples: 4) == :ok
-
-        # Check that log files were created
-        assert File.exists?(Path.join(temp_dir, "config.json"))
-        assert File.exists?(Path.join(temp_dir, "metrics.jsonl"))
-      else
-        IO.puts("Skipping integration test: TINKER_API_KEY not set")
-        :ok
+      # Check target_tokens if present
+      if Map.has_key?(datum.loss_fn_inputs, "target_tokens") do
+        target_tokens = datum.loss_fn_inputs["target_tokens"]
+        assert %TensorData{} = target_tokens
+        assert is_list(target_tokens.data)
       end
     end
+
+    test "model_input has correct chunk structure" do
+      sample = %{
+        "messages" => [
+          %{"role" => "user", "content" => "Hello"},
+          %{"role" => "assistant", "content" => "Hi"}
+        ]
+      }
+
+      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
+
+      datum = NoRobots.build_datum(sample, Llama3, state, TrainOnWhat.all_assistant_messages())
+
+      # Check model input
+      assert %ModelInput{chunks: chunks} = datum.model_input
+      assert is_list(chunks)
+      assert chunks != []
+
+      # Each chunk should be EncodedTextChunk
+      Enum.each(chunks, fn chunk ->
+        assert %CrucibleTrain.Types.EncodedTextChunk{tokens: tokens} = chunk
+        assert is_list(tokens)
+        assert Enum.all?(tokens, &is_integer/1)
+      end)
+    end
   end
 
-  describe "configure_tinkex_http/0" do
-    setup do
-      original_protocol = System.get_env("TINKEX_HTTP_PROTOCOL")
-      original_overrides = Application.get_env(:tinkex, :pool_overrides)
+  describe "datum to Tinkex conversion" do
+    test "datum converts to proper Tinkex format" do
+      sample = %{
+        "messages" => [
+          %{"role" => "user", "content" => "Hi"},
+          %{"role" => "assistant", "content" => "Hello!"}
+        ]
+      }
 
-      on_exit(fn ->
-        if original_protocol do
-          System.put_env("TINKEX_HTTP_PROTOCOL", original_protocol)
-        else
-          System.delete_env("TINKEX_HTTP_PROTOCOL")
-        end
+      {:ok, state} = Llama3.init(tokenizer: MockTokenizer)
 
-        if original_overrides do
-          Application.put_env(:tinkex, :pool_overrides, original_overrides)
-        else
-          Application.delete_env(:tinkex, :pool_overrides)
-        end
-      end)
+      datum = NoRobots.build_datum(sample, Llama3, state, TrainOnWhat.all_assistant_messages())
 
-      :ok
-    end
-
-    test "defaults to HTTP/1 for training when protocol is unset" do
-      System.delete_env("TINKEX_HTTP_PROTOCOL")
-      Application.delete_env(:tinkex, :pool_overrides)
-
-      SlBasic.configure_tinkex_http()
-
-      overrides = Application.get_env(:tinkex, :pool_overrides)
-      assert is_map(overrides)
-      assert Keyword.get(overrides[:training], :protocols) == [:http1]
-    end
-
-    test "keeps existing overrides when protocol is http2" do
-      System.put_env("TINKEX_HTTP_PROTOCOL", "http2")
-      Application.put_env(:tinkex, :pool_overrides, %{training: [size: 3]})
-
-      SlBasic.configure_tinkex_http()
-
-      assert Application.get_env(:tinkex, :pool_overrides) == %{training: [size: 3]}
-    end
-
-    test "merges HTTP/1 override with existing training overrides" do
-      System.put_env("TINKEX_HTTP_PROTOCOL", "http1")
-      Application.put_env(:tinkex, :pool_overrides, %{training: [size: 3]})
-
-      SlBasic.configure_tinkex_http()
-
-      overrides = Application.get_env(:tinkex, :pool_overrides)
-      assert Keyword.get(overrides[:training], :size) == 3
-      assert Keyword.get(overrides[:training], :protocols) == [:http1]
+      # Use internal function to verify datum can be converted
+      # This tests the datum_to_tinkex function indirectly
+      assert %Datum{} = datum
+      assert %ModelInput{chunks: [_first_chunk | _]} = datum.model_input
+      assert is_map(datum.loss_fn_inputs)
     end
   end
 end

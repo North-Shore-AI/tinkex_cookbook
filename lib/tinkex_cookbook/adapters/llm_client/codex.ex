@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.LLMClient.Codex do
   LLM adapter backed by the Codex CLI via codex_sdk.
   """
 
-  @behaviour TinkexCookbook.Ports.LLMClient
+  @behaviour CrucibleTrain.Ports.LLMClient
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def chat(adapter_opts, messages, opts) do

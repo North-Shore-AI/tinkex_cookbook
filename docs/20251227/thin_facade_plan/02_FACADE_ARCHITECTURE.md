@@ -4,6 +4,10 @@
 
 This document details the hexagonal architecture design for the TinkexCookbook facade, including the Runtime module, ports system, and adapter wiring.
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only. The
+examples below are retained for historical context.
+
 ---
 
 ## Architecture Overview

@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.VectorStore.Chroma do
   ChromaDB adapter for the VectorStore port.
   """
 
-  @behaviour TinkexCookbook.Ports.VectorStore
+  @behaviour CrucibleTrain.Ports.VectorStore
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def create_collection(_opts, name, metadata) do

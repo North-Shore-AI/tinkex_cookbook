@@ -4,6 +4,9 @@ Date: 2025-12-26
 Status: Draft
 Owner: North-Shore-AI
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only.
+
 ## 1) Purpose
 
 Rebuild `tinkex_cookbook` as a thin recipe and adapter layer that delegates all training and core ML infrastructure to the Crucible ecosystem. This document defines the architectural boundaries, module layout, integration points, and migration path to make the cookbook the canonical foundation for Tinker recipes without duplicating training infrastructure.

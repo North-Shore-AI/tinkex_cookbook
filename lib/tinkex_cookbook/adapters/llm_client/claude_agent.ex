@@ -3,10 +3,10 @@ defmodule TinkexCookbook.Adapters.LLMClient.ClaudeAgent do
   LLM adapter backed by the Claude Code CLI via claude_agent_sdk.
   """
 
-  @behaviour TinkexCookbook.Ports.LLMClient
+  @behaviour CrucibleTrain.Ports.LLMClient
 
   alias ClaudeAgentSDK.{ContentExtractor, Message, Options}
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def chat(adapter_opts, messages, opts) do

@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.HubClient.HfHub do
   Adapter for HuggingFace Hub operations via HfHub.
   """
 
-  @behaviour TinkexCookbook.Ports.HubClient
+  @behaviour CrucibleTrain.Ports.HubClient
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   @impl true
   def download(adapter_opts, opts) do

@@ -4,6 +4,9 @@ Date: 2025-12-26
 Status: Draft
 Owner: North-Shore-AI
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only.
+
 ## 1) Purpose
 
 Define the hexagonal (ports and adapters) architecture for the thin

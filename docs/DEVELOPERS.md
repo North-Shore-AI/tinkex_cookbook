@@ -2,7 +2,8 @@
 
 This guide captures the core architecture, dependency strategy, and development
 rules for the Elixir port of tinker-cookbook. It is written for contributors
-who need to extend recipes, adapters, or core data types.
+who need to extend recipes or configuration in this repo, with adapters living
+in `crucible_kitchen` and core types/renderers in `crucible_train`.
 
 ---
 
@@ -22,112 +23,56 @@ who need to extend recipes, adapters, or core data types.
 
 ## 2) Repo Map (Key Modules)
 
-Core types:
-- `lib/tinkex_cookbook/types/*` (TensorData, ModelInput, Datum)
-- `lib/tinkex_cookbook/types.ex` (type aliases)
-
-Renderers:
-- `lib/tinkex_cookbook/renderers/*` (TrainOnWhat, Renderer behavior, types)
-
-Supervised:
-- `lib/tinkex_cookbook/supervised/*` (configs, dataset behavior, helpers)
-
-Recipes:
+Recipes and runtime:
 - `lib/tinkex_cookbook/recipes/*` (entrypoints and orchestration)
+- `lib/tinkex_cookbook/runtime/*` (composition root and runners)
+- `lib/tinkex_cookbook/datasets/*` (dataset helpers)
+- `lib/tinkex_cookbook/eval/*` (evaluation helpers)
+- `lib/tinkex_cookbook/utils/*` and `lib/tinkex_cookbook/tokenizer_utils.ex` (shared utilities)
 
-Ports and adapters:
-- `lib/tinkex_cookbook/ports.ex`
-- `lib/tinkex_cookbook/ports/*`
-- `lib/tinkex_cookbook/adapters/*`
+Legacy (deprecated; do not extend):
+- `lib/tinkex_cookbook/adapters/*` (superseded by `crucible_kitchen` adapters)
 
----
-
-## 3) Ports and Adapters (Core Architecture)
-
-**Ports** are the cookbook-facing interfaces (behaviours).
-**Adapters** implement those ports for specific clients/libraries.
-
-Ports:
-- `Ports.VectorStore` (vector DB ops)
-- `Ports.EmbeddingClient` (embedding generation)
-- `Ports.LLMClient` (chat/completion inference)
-- `Ports.DatasetStore` (dataset loading + ops)
-- `Ports.HubClient` (HuggingFace Hub)
-- `Ports.BlobStore` (local or cloud file access)
-
-Adapters:
-- VectorStore: `Adapters.VectorStore.Chroma`, `Adapters.VectorStore.Noop`
-- DatasetStore: `Adapters.DatasetStore.HfDatasets`, `Adapters.DatasetStore.Noop`
-- HubClient: `Adapters.HubClient.HfHub`, `Adapters.HubClient.Noop`
-- BlobStore: `Adapters.BlobStore.Local`, `Adapters.BlobStore.Noop`
-- LLMClient: `Adapters.LLMClient.Codex`, `Adapters.LLMClient.ClaudeAgent`,
-  `Adapters.LLMClient.Noop`
-- EmbeddingClient: `Adapters.EmbeddingClient.Noop`
-
-Composition root:
-```elixir
-ports =
-  TinkexCookbook.Ports.new(
-    ports: [
-      vector_store: {TinkexCookbook.Adapters.VectorStore.Chroma, []},
-      llm_client: {TinkexCookbook.Adapters.LLMClient.Codex, []}
-    ]
-  )
-```
-
-App-level config:
-```elixir
-config :tinkex_cookbook, TinkexCookbook.Ports,
-  vector_store: {TinkexCookbook.Adapters.VectorStore.Chroma, []},
-  llm_client: {TinkexCookbook.Adapters.LLMClient.ClaudeAgent, []}
-```
-
-**Rule:** recipes call ports only, never external clients directly.
+External (authoritative):
+- `crucible_kitchen/lib/crucible_kitchen/adapters/*` (adapter implementations)
+- `crucible_train/lib/crucible_train/types/*` and `crucible_train/lib/crucible_train/renderers/*`
 
 ---
 
-## 4) LLM Adapters
+## 3) Adapter Ownership (Corrected Model)
 
-### 4.1 Codex Adapter (`Adapters.LLMClient.Codex`)
+TinkexCookbook recipes call CrucibleKitchen workflows and supply adapter maps.
+Adapters implementing CrucibleTrain ports live in `crucible_kitchen`, not here.
 
-Uses the Codex CLI via `codex_sdk` to run a turn on a thread.
+Example adapter map:
+```elixir
+adapters = %{
+  training_client: {CrucibleKitchen.Adapters.Tinkex.TrainingClient, []},
+  dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []},
+  hub_client: {CrucibleKitchen.Adapters.HfHub.HubClient, []},
+  blob_store: {CrucibleKitchen.Adapters.Noop.BlobStore, []}
+}
 
-Inputs:
-- `messages` list (chat-style, `%{role, content}`)
-- `output_schema` (map) for structured output
-- Optional `codex_opts`, `thread_opts`, `turn_opts`
+CrucibleKitchen.run(TinkexCookbook.Recipes.SlBasicV2, config, adapters: adapters)
+```
 
-Structured output:
-- `output_schema` is passed to `Codex.Thread.run/3`
-- Response includes `structured_output` if the model produced valid JSON
+Legacy note: modules under `lib/tinkex_cookbook/adapters` are deprecated and
+will be removed. Do not add new adapters here.
 
-CLI requirements:
-- `codex` executable installed
-- Auth via `CODEX_API_KEY` or CLI login
+---
 
-### 4.2 Claude Adapter (`Adapters.LLMClient.ClaudeAgent`)
+## 4) Legacy LLM Adapters (Deprecated)
 
-Uses the Claude Code CLI via `claude_agent_sdk` and streams messages.
-
-Inputs:
-- `messages` list (chat-style, `%{role, content}`)
-- `output_schema` (map), mapped to `Options.output_format`
-- Optional `options` (ClaudeAgentSDK.Options)
-
-Structured output:
-- `output_schema` is mapped to `{:json_schema, schema}`
-- Response includes `structured_output` from result frames
-
-CLI requirements:
-- `claude` / `claude-code` executable installed
-- Auth via OAuth token or CLI login
+LLM adapter modules under `lib/tinkex_cookbook/adapters/llm_client` are legacy.
+Do not extend them; prefer external integration via `crucible_kitchen` adapters
+or application-specific tooling.
 
 ---
 
 ## 5) Dataset + Hub Stack
 
-- Datasets use `hf_datasets_ex`.
-- Hub access uses `hf_hub`.
+- Dataset adapters in `crucible_kitchen` use `hf_datasets_ex`.
+- Hub adapters in `crucible_kitchen` use `hf_hub_ex`.
 - Do not reintroduce Python datasets or CrucibleDatasets.
 
 DatasetStore port supports:
@@ -183,11 +128,11 @@ Quality gates:
 ## 9) Adding a New Adapter
 
 Checklist:
-1. Add a port behaviour if needed.
-2. Implement adapter under `lib/tinkex_cookbook/adapters`.
-3. Normalize errors to `TinkexCookbook.Ports.Error`.
-4. Add tests with Mox or stub modules.
-5. Update `docs/20251223/PORTS_AND_ADAPTERS.md`.
+1. Add/update a port behaviour in `crucible_train` or `crucible_telemetry` if needed.
+2. Implement adapter under `crucible_kitchen/lib/crucible_kitchen/adapters`.
+3. Add tests in `crucible_kitchen`.
+4. Update corrected ownership docs (`crucible_kitchen/docs/corrected_ownership_model/*`).
+5. Do not add new adapters to `tinkex_cookbook` (legacy modules are deprecated).
 
 ---
 
@@ -203,6 +148,7 @@ Checklist:
 
 ## 11) Reference Docs
 
-- `docs/20251223/PORTS_AND_ADAPTERS.md`
+- `crucible_kitchen/docs/corrected_ownership_model/00-canonical-architecture.md`
+- `docs/20251223/PORTS_AND_ADAPTERS.md` (historical)
 - `docs/20251223/PYTHON_TO_ELIXIR_LIBRARY_MAPPING.md`
 - `docs/20251221/COOKBOOK_CORE_FOUNDATION.md`

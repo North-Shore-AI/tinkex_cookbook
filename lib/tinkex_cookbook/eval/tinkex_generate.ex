@@ -25,7 +25,7 @@ defmodule TinkexCookbook.Eval.TinkexGenerate do
         temperature: 0.7,
         max_tokens: 1024,
         stop: ["<|eot_id|>"],
-        renderer_module: TinkexCookbook.Renderers.Llama3,
+        renderer_module: CrucibleTrain.Renderers.Llama3,
         renderer_state: renderer_state
       }
 
@@ -41,8 +41,8 @@ defmodule TinkexCookbook.Eval.TinkexGenerate do
 
   @behaviour CrucibleHarness.Generate
 
-  alias TinkexCookbook.Renderers.{Renderer, Types}
-  alias TinkexCookbook.Types.ModelInput
+  alias CrucibleTrain.Renderers.{Renderer, Types}
+  alias CrucibleTrain.Types.ModelInput
 
   @impl true
   @doc """

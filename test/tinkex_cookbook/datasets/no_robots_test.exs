@@ -6,11 +6,11 @@ defmodule TinkexCookbook.Datasets.NoRobotsTest do
   """
   use ExUnit.Case, async: true
 
+  alias CrucibleTrain.Renderers.{Llama3, TrainOnWhat}
+  alias CrucibleTrain.Supervised.Dataset, as: SupervisedDataset
+  alias CrucibleTrain.Types.{Datum, ModelInput, TensorData}
   alias TinkexCookbook.Datasets.NoRobots
-  alias TinkexCookbook.Renderers.{Llama3, TrainOnWhat}
-  alias TinkexCookbook.Supervised.SupervisedDataset
   alias TinkexCookbook.Test.MockTokenizer
-  alias TinkexCookbook.Types.{Datum, ModelInput, TensorData}
 
   describe "sample_to_messages/1" do
     test "extracts messages from a sample" do
@@ -206,7 +206,7 @@ defmodule TinkexCookbook.Datasets.NoRobotsTest do
           batch_size: 2
         )
 
-      assert %TinkexCookbook.Supervised.SupervisedDatasetFromSamples{} = dataset
+      assert %CrucibleTrain.Supervised.DatasetFromSamples{} = dataset
     end
 
     test "dataset has correct number of batches", %{state: state, samples: samples} do

@@ -1,7 +1,11 @@
 defmodule TinkexCookbook.Utils.MlLogTest do
-  use ExUnit.Case, async: true
+  # async: false because tests need to capture Logger output which requires
+  # changing the global Logger level
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
+
+  require Logger
 
   alias TinkexCookbook.Utils.MlLog
 
@@ -9,7 +13,14 @@ defmodule TinkexCookbook.Utils.MlLogTest do
     temp_dir = Path.join(System.tmp_dir!(), "ml_log_test_#{:rand.uniform(100_000)}")
     File.rm_rf(temp_dir)
 
-    on_exit(fn -> File.rm_rf(temp_dir) end)
+    # Save original logger level and set to :info for these tests
+    original_level = Logger.level()
+    Logger.configure(level: :info)
+
+    on_exit(fn ->
+      Logger.configure(level: original_level)
+      File.rm_rf(temp_dir)
+    end)
 
     {:ok, temp_dir: temp_dir}
   end
@@ -28,7 +39,7 @@ defmodule TinkexCookbook.Utils.MlLogTest do
       config = %{learning_rate: 0.001, batch_size: 32}
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           logger = MlLog.setup_logging(temp_dir, config: config)
 
           assert logger.logged_hparams? == true
@@ -50,7 +61,7 @@ defmodule TinkexCookbook.Utils.MlLogTest do
       logger = MlLog.setup_logging(temp_dir)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           MlLog.log_metrics(logger, %{loss: 0.5, accuracy: 0.9}, 1)
           MlLog.log_metrics(logger, %{loss: 0.3, accuracy: 0.95}, 2)
         end)
@@ -77,7 +88,7 @@ defmodule TinkexCookbook.Utils.MlLogTest do
       logger = MlLog.setup_logging(temp_dir)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           MlLog.log_metrics(logger, %{final_loss: 0.1})
         end)
 
@@ -96,7 +107,7 @@ defmodule TinkexCookbook.Utils.MlLogTest do
       logger = MlLog.setup_logging(temp_dir)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           logger = MlLog.log_hparams(logger, %{lr: 0.01})
           assert logger.logged_hparams? == true
 
@@ -120,7 +131,7 @@ defmodule TinkexCookbook.Utils.MlLogTest do
       logger = MlLog.setup_logging(temp_dir)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           assert MlLog.close(logger) == :ok
         end)
 

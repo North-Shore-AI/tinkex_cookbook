@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.BlobStore.Noop do
   No-op adapter for blob access.
   """
 
-  @behaviour TinkexCookbook.Ports.BlobStore
+  @behaviour CrucibleTrain.Ports.BlobStore
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   defp error do
     Error.new(:blob_store, __MODULE__, "Blob store adapter is not configured")

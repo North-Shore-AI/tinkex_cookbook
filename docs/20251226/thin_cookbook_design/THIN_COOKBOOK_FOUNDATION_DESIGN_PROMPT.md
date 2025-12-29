@@ -2,6 +2,9 @@
 
 Date: 2025-12-26
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only.
+
 ## Goal
 
 Implement the architecture described in:

@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.VectorStore.Noop do
   No-op adapter for vector store operations.
   """
 
-  @behaviour TinkexCookbook.Ports.VectorStore
+  @behaviour CrucibleTrain.Ports.VectorStore
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   defp error do
     Error.new(:vector_store, __MODULE__, "Vector store adapter is not configured")

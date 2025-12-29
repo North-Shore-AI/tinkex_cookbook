@@ -22,27 +22,20 @@ defmodule TinkexCookbook.Datasets.NoRobots do
       # Load dataset from HuggingFace
       {:ok, samples} = NoRobots.load(split: "train", limit: 100)
 
-      # Build datums for training
-      datums = NoRobots.build_datums(samples, Llama3, state, TrainOnWhat.all_assistant_messages())
-
       # Create a supervised dataset
       dataset = NoRobots.create_supervised_dataset(samples,
-        renderer_module: Llama3,
+        renderer_module: CrucibleTrain.Renderers.Llama3,
         renderer_state: state,
-        train_on_what: TrainOnWhat.all_assistant_messages(),
+        train_on_what: :all_assistant_messages,
         batch_size: 32
       )
   """
 
-  alias TinkexCookbook.Renderers.{Renderer, TrainOnWhat, Types}
-  alias TinkexCookbook.Supervised.{Common, SupervisedDatasetFromSamples}
-  alias TinkexCookbook.Types.Datum
-  alias TinkexCookbook.Utils.Parity
+  alias CrucibleTrain.Renderers.{Renderer, Types}
+  alias CrucibleTrain.Supervised.{Common, Dataset, DatasetFromSamples}
+  alias CrucibleTrain.Types.Datum
 
   @dataset_name "HuggingFaceH4/no_robots"
-
-  # Agent for tracking rendered sample count in parity mode
-  @rendered_sample_counter __MODULE__.RenderedSampleCounter
 
   @doc """
   Loads the NoRobots dataset from HuggingFace.
@@ -51,6 +44,7 @@ defmodule TinkexCookbook.Datasets.NoRobots do
 
   - `:split` - The dataset split to load ("train" or "test"). Defaults to "train".
   - `:limit` - Maximum number of samples to load. Defaults to nil (all).
+  - `:shuffle_seed` - Seed for shuffling. Defaults to nil (no shuffle).
 
   ## Returns
 
@@ -82,7 +76,7 @@ defmodule TinkexCookbook.Datasets.NoRobots do
   @doc """
   Extracts messages from a dataset sample.
 
-  Converts the raw message maps to Types.Message structs.
+  Converts the raw message maps to Message structs.
   """
   @spec sample_to_messages(map()) :: [Types.Message.t()]
   def sample_to_messages(%{"messages" => messages}) when is_list(messages) do
@@ -105,14 +99,21 @@ defmodule TinkexCookbook.Datasets.NoRobots do
   - `sample` - A dataset sample with a "messages" field
   - `renderer_module` - The renderer module to use (e.g., Llama3)
   - `renderer_state` - The renderer state from init/1
-  - `train_on_what` - Training weight strategy (see TrainOnWhat)
+  - `train_on_what` - Training weight strategy (atom: :all_assistant_messages, etc.)
   - `max_length` - Optional maximum sequence length (default: nil)
 
   ## Returns
 
   A Datum struct ready for training with properly shifted inputs/targets.
   """
-  @spec build_datum(map(), module(), map(), TrainOnWhat.t(), pos_integer() | nil) :: Datum.t()
+  @spec build_datum(
+          map(),
+          module(),
+          map(),
+          CrucibleTrain.Renderers.TrainOnWhat.t(),
+          pos_integer() | nil
+        ) ::
+          Datum.t()
   def build_datum(sample, renderer_module, renderer_state, train_on_what, max_length \\ nil) do
     messages = sample_to_messages(sample)
 
@@ -123,10 +124,6 @@ defmodule TinkexCookbook.Datasets.NoRobots do
         train_on_what,
         renderer_state
       )
-
-    # Log rendered sample for parity comparison (if PARITY_MODE=1, first 10 samples)
-    sample_index = get_and_increment_rendered_sample_count()
-    maybe_log_rendered_sample(sample_index, sample, model_input, weights)
 
     # Use the common function that handles right-shift/left-shift
     Common.datum_from_model_input_weights(model_input, weights, max_length)
@@ -147,8 +144,13 @@ defmodule TinkexCookbook.Datasets.NoRobots do
 
   List of Datum structs.
   """
-  @spec build_datums([map()], module(), map(), TrainOnWhat.t(), pos_integer() | nil) ::
-          [Datum.t()]
+  @spec build_datums(
+          [map()],
+          module(),
+          map(),
+          CrucibleTrain.Renderers.TrainOnWhat.t(),
+          pos_integer() | nil
+        ) :: [Datum.t()]
   def build_datums(samples, renderer_module, renderer_state, train_on_what, max_length \\ nil) do
     Enum.map(samples, fn sample ->
       build_datum(sample, renderer_module, renderer_state, train_on_what, max_length)
@@ -158,46 +160,37 @@ defmodule TinkexCookbook.Datasets.NoRobots do
   @doc """
   Creates a SupervisedDataset from a list of samples.
 
-  Uses lazy datum building to match Python's `SupervisedDatasetFromHFDataset` behavior:
+  Uses lazy datum building:
   - Stores samples (not datums)
-  - Shuffles samples on `set_epoch/2` using HfDatasetsEx (PCG64-based)
+  - Shuffles samples on `set_epoch/2`
   - Builds datums lazily during `get_batch/2`
-
-  This ensures parity with Python's training loop.
 
   ## Options
 
   - `:renderer_module` - Required. The renderer module to use.
   - `:renderer_state` - Required. The renderer state from init/1.
-  - `:train_on_what` - Training weight strategy. Defaults to all_assistant_messages.
+  - `:train_on_what` - Training weight strategy. Defaults to :all_assistant_messages.
   - `:batch_size` - Batch size. Defaults to 32.
   - `:max_length` - Maximum sequence length. Defaults to nil (no limit).
 
   ## Returns
 
-  A SupervisedDatasetFromSamples struct.
+  A Dataset struct.
   """
-  @spec create_supervised_dataset([map()], keyword()) :: SupervisedDatasetFromSamples.t()
+  @spec create_supervised_dataset([map()], keyword()) :: Dataset.t() | DatasetFromSamples.t()
   def create_supervised_dataset(samples, opts) do
     renderer_module = Keyword.fetch!(opts, :renderer_module)
     renderer_state = Keyword.fetch!(opts, :renderer_state)
-    train_on_what = Keyword.get(opts, :train_on_what, TrainOnWhat.all_assistant_messages())
+    train_on_what = Keyword.get(opts, :train_on_what, :all_assistant_messages)
     batch_size = Keyword.get(opts, :batch_size, 32)
     max_length = Keyword.get(opts, :max_length)
 
-    # Log dataset snapshot for parity comparison (if PARITY_MODE=1)
-    Parity.log_dataset_snapshot(samples, 10)
-
-    # Start rendered sample counter for parity mode (will be used during lazy datum building)
-    start_rendered_sample_counter()
-
     # Create datum builder function for lazy evaluation
-    # This matches Python's map_fn that's called during get_batch
     datum_builder = fn sample ->
       build_datum(sample, renderer_module, renderer_state, train_on_what, max_length)
     end
 
-    SupervisedDatasetFromSamples.new(samples, batch_size, datum_builder)
+    DatasetFromSamples.new(samples, batch_size, datum_builder)
   end
 
   # Private helpers
@@ -209,40 +202,5 @@ defmodule TinkexCookbook.Datasets.NoRobots do
 
   defp maybe_shuffle_dataset(dataset, seed) when is_integer(seed) do
     HfDatasetsEx.Dataset.shuffle(dataset, seed: seed)
-  end
-
-  # Parity mode helpers
-
-  @doc false
-  def start_rendered_sample_counter do
-    if Parity.parity_mode?() do
-      Agent.start_link(fn -> 0 end, name: @rendered_sample_counter)
-    end
-  end
-
-  @doc false
-  def stop_rendered_sample_counter do
-    if Process.whereis(@rendered_sample_counter) do
-      Agent.stop(@rendered_sample_counter)
-    end
-  end
-
-  defp get_and_increment_rendered_sample_count do
-    if Process.whereis(@rendered_sample_counter) do
-      Agent.get_and_update(@rendered_sample_counter, fn count -> {count, count + 1} end)
-    else
-      nil
-    end
-  end
-
-  defp maybe_log_rendered_sample(sample_index, sample, model_input, weights) do
-    if Parity.parity_mode?() && sample_index != nil && sample_index < 10 do
-      messages =
-        sample
-        |> sample_to_messages()
-        |> Enum.map(fn msg -> %{role: msg.role, content: msg.content} end)
-
-      Parity.log_rendered_sample(sample_index, messages, model_input, weights)
-    end
   end
 end

@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.DatasetStore.Noop do
   No-op adapter for dataset store operations.
   """
 
-  @behaviour TinkexCookbook.Ports.DatasetStore
+  @behaviour CrucibleTrain.Ports.DatasetStore
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   defp error do
     Error.new(:dataset_store, __MODULE__, "Dataset adapter is not configured")

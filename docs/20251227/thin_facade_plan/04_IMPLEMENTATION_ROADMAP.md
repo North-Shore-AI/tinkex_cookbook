@@ -4,6 +4,9 @@
 
 This document provides a detailed, step-by-step implementation plan for transforming tinkex_cookbook into a thin facade.
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; TinkexCookbook provides recipes/config only.
+
 ---
 
 ## Phase Overview

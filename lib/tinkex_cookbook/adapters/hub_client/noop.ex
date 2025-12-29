@@ -3,9 +3,9 @@ defmodule TinkexCookbook.Adapters.HubClient.Noop do
   No-op adapter for HuggingFace Hub operations.
   """
 
-  @behaviour TinkexCookbook.Ports.HubClient
+  @behaviour CrucibleTrain.Ports.HubClient
 
-  alias TinkexCookbook.Ports.Error
+  alias CrucibleTrain.Ports.Error
 
   defp error do
     Error.new(:hub_client, __MODULE__, "Hub adapter is not configured")

@@ -5,9 +5,13 @@ defmodule TinkexCookbook.Eval.RunnerTest do
   These tests verify that the Runner correctly orchestrates
   evaluation using EvalEx tasks and TinkexGenerate.
   """
-  use ExUnit.Case, async: true
+  # async: false because tests need to capture Logger output which requires
+  # changing the global Logger level
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
+
+  require Logger
 
   alias TinkexCookbook.Eval.Runner
   alias TinkexCookbook.Test.MockTinkex
@@ -28,6 +32,14 @@ defmodule TinkexCookbook.Eval.RunnerTest do
         %{id: "1", input: "What is 2+2?", target: "4"},
         %{id: "2", input: "What is 3+3?", target: "6"}
       ]
+
+      # Save original logger level and set to :info for these tests
+      original_level = Logger.level()
+      Logger.configure(level: :info)
+
+      on_exit(fn ->
+        Logger.configure(level: original_level)
+      end)
 
       %{config: config, samples: samples}
     end

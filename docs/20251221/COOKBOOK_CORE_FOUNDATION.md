@@ -5,6 +5,9 @@
 **Context:** Full North-Shore-AI ecosystem now integrated. This document captures
 the current doc inventory, remaining Python libraries to consider, and the core foundation plan.
 
+NOTE: Superseded by the corrected ownership model. Adapter implementations now
+live in `crucible_kitchen`; references to tinkex_cookbook adapters are historical.
+
 > **2025-12-23 Update:** Added crucible_harness, eval_ex from Hex for inspect-ai parity.
 > Two separate concerns now identified: Training recipes (Phase 1) and Evaluation harness (new).
 
