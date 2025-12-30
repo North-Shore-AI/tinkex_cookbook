@@ -19,9 +19,9 @@ defmodule TinkexCookbook.Recipes.SlBasic do
 
   alias CrucibleIR.{BackendRef, DatasetRef, Experiment, ModelRef, StageDef}
   alias CrucibleIR.Training
+  alias CrucibleKitchen.Adapters.Tinkex.TrainingClient, as: TinkexAdapter
   alias CrucibleTrain.Renderers.TrainOnWhat
   alias CrucibleTrain.Supervised.Dataset, as: SupervisedDataset
-  alias CrucibleKitchen.Adapters.Tinkex.TrainingClient, as: TinkexAdapter
   alias TinkexCookbook.Datasets.NoRobots
 
   require Logger

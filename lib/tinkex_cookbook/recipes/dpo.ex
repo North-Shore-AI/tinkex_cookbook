@@ -1,47 +1,56 @@
-defmodule TinkexCookbook.Recipes.SlBasicV2 do
+defmodule TinkexCookbook.Recipes.DPO do
   @moduledoc """
-  Supervised Learning Basic recipe - V2 using CrucibleKitchen.
+  Direct Preference Optimization (DPO) recipe.
 
-  This is the refactored version that uses CrucibleKitchen as the core
-  orchestration engine. It provides the same functionality as sl_basic
-  but with the benefits of the crucible_kitchen architecture:
+  Implements DPO training for aligning language models with human preferences.
+  Uses CrucibleKitchen's Preference workflow with Tinkex backend.
 
-  - Hexagonal architecture with pluggable adapters
-  - Built-in telemetry and metrics
-  - Standardized workflow stages
-  - Better testing and composability
-  - **Model evaluation** with metrics (accuracy, F1, precision, recall)
-  - **Model registration** with lineage tracking
+  ## DPO Overview
+
+  DPO optimizes the model to prefer "chosen" responses over "rejected" responses:
+
+      L = -log(sigmoid(β * (log π(y_w|x) - log π(y_l|x) - log π_ref(y_w|x) + log π_ref(y_l|x))))
+
+  Where:
+  - β (beta) controls the strength of the preference constraint
+  - π is the policy being trained
+  - π_ref is the frozen reference model (usually the initial model)
+  - y_w is the chosen (winning) response
+  - y_l is the rejected (losing) response
+
+  ## Supported Datasets
+
+  - `:hhh` - HHH (Helpful, Harmless, Honest) dataset
+  - `:ultrafeedback` - UltraFeedback dataset
+  - `:helpsteer3` - HelpSteer3 dataset
 
   ## Usage
 
-      # Using CrucibleKitchen.run
-      adapters = TinkexCookbook.Recipes.SlBasicV2.default_adapters()
-      CrucibleKitchen.run(TinkexCookbook.Recipes.SlBasicV2, %{
-        model: "meta-llama/Llama-3.1-8B",
-        epochs: 1
-      }, adapters: adapters)
-
-      # Using the convenience function
-      TinkexCookbook.Recipes.SlBasicV2.run(%{
-        model: "meta-llama/Llama-3.1-8B",
-        dataset: :no_robots
+      # Run with defaults
+      TinkexCookbook.Recipes.DPO.run(%{
+        model: "meta-llama/Llama-3.2-1B",
+        dataset: :hhh
       })
 
-  ## Training Pipeline
-
-  The supervised workflow includes:
-  1. Dataset loading and tokenization
-  2. Training loop (forward/backward, optimizer step)
-  3. Checkpoint saving
-  4. **Final evaluation** - computes accuracy, F1, precision, recall
-  5. **Model registration** - registers in model registry with lineage
+      # Custom configuration
+      TinkexCookbook.Recipes.DPO.run(%{
+        model: "meta-llama/Llama-3.1-8B",
+        dataset: :ultrafeedback,
+        dpo_beta: 0.05,
+        learning_rate: 5.0e-6,
+        batch_size: 128
+      })
 
   ## Results
 
   After training completes, you can access:
-  - `result.context.state.eval_results` - Evaluation metrics
+  - `result.context.state.dpo_metrics` - DPO training metrics
+  - `result.context.state.eval_results` - Evaluation results (if enabled)
   - `result.context.state.registered_model` - Registered model record
+
+  ## References
+
+  - Rafailov et al., "Direct Preference Optimization" (2023)
   """
 
   use CrucibleKitchen.Recipe
@@ -50,38 +59,42 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
   alias CrucibleKitchen.Adapters.Noop.Evaluator, as: NoopEvaluator
   alias CrucibleKitchen.Adapters.Noop.ModelRegistry, as: NoopModelRegistry
   alias CrucibleKitchen.Adapters.Tinkex.TrainingClient, as: TinkexAdapter
-  alias CrucibleKitchen.Workflows.Supervised, as: SupervisedWorkflow
+  alias CrucibleKitchen.Workflows.Preference, as: PreferenceWorkflow
 
   require Logger
 
   @impl true
-  def name, do: :sl_basic_v2
+  def name, do: :dpo
 
   @impl true
   def description do
-    "Supervised fine-tuning using CrucibleKitchen with Tinkex backend"
+    "Direct Preference Optimization training with Tinkex backend"
   end
 
   @impl true
   def default_config do
     %{
       # Model config
-      model: "meta-llama/Llama-3.1-8B",
+      model: "meta-llama/Llama-3.2-1B",
+      reference_model: nil,
       lora_rank: 32,
 
       # Dataset config
-      dataset: :no_robots,
+      dataset: :hhh,
       split: "train",
+
+      # DPO-specific config
+      dpo_beta: 0.1,
 
       # Training config
       epochs: 1,
-      batch_size: 128,
-      learning_rate: 2.0e-4,
+      batch_size: 256,
+      learning_rate: 1.0e-5,
       lr_schedule: :linear,
-      max_length: 32_768,
+      max_length: 8192,
 
       # Checkpoint config
-      save_every: 20,
+      save_every: 100,
       eval_every: 0,
 
       # Logging config
@@ -101,26 +114,45 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
 
   @impl true
   def workflow do
-    SupervisedWorkflow.__workflow__()
+    PreferenceWorkflow.__workflow__()
   end
 
   @impl true
   def validate_config(config) do
-    cond do
-      is_nil(config[:model]) or config[:model] == "" ->
-        {:error, "model is required"}
+    with :ok <- validate_model(config),
+         :ok <- validate_dataset(config) do
+      validate_training_params(config)
+    end
+  end
 
+  defp validate_model(config) do
+    if is_nil(config[:model]) or config[:model] == "" do
+      {:error, "model is required"}
+    else
+      :ok
+    end
+  end
+
+  defp validate_dataset(config) do
+    cond do
       is_nil(config[:dataset]) ->
         {:error, "dataset is required"}
 
-      config[:epochs] < 1 ->
-        {:error, "epochs must be >= 1"}
-
-      config[:batch_size] < 1 ->
-        {:error, "batch_size must be >= 1"}
+      config[:dataset] not in [:hhh, :ultrafeedback, :helpsteer3] and
+          not is_binary(config[:dataset]) ->
+        {:error, "dataset must be :hhh, :ultrafeedback, :helpsteer3, or a path"}
 
       true ->
         :ok
+    end
+  end
+
+  defp validate_training_params(config) do
+    cond do
+      config[:epochs] < 1 -> {:error, "epochs must be >= 1"}
+      config[:batch_size] < 1 -> {:error, "batch_size must be >= 1"}
+      config[:dpo_beta] <= 0 -> {:error, "dpo_beta must be positive"}
+      true -> :ok
     end
   end
 
@@ -129,7 +161,7 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
   # ===========================================================================
 
   @doc """
-  Run the recipe with default Tinkex adapters.
+  Run the DPO recipe with default Tinkex adapters.
 
   ## Options
 
@@ -138,9 +170,10 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
 
   ## Example
 
-      TinkexCookbook.Recipes.SlBasicV2.run(%{
-        model: "meta-llama/Llama-3.1-8B",
-        epochs: 2
+      TinkexCookbook.Recipes.DPO.run(%{
+        model: "meta-llama/Llama-3.2-1B",
+        dataset: :hhh,
+        dpo_beta: 0.1
       })
   """
   @spec run(map(), keyword()) :: {:ok, map()} | {:error, term()}
@@ -178,13 +211,11 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
   defp maybe_add(opts, key, value), do: Keyword.put(opts, key, value)
 
   # ===========================================================================
-  # Legacy Compatibility
+  # CLI Entry Point
   # ===========================================================================
 
   @doc """
-  Backward compatible entry point for CLI execution.
-
-  Delegates to run/2 with parsed arguments.
+  CLI entry point for mix kitchen.run :dpo.
   """
   @spec main(list(String.t())) :: :ok | {:error, term()}
   def main(argv \\ System.argv()) do
@@ -199,26 +230,24 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
 
     case run(config) do
       {:ok, result} ->
-        Logger.info("Training completed successfully")
+        Logger.info("DPO training completed successfully")
         Logger.info("Final step: #{result.context.state[:global_step]}")
 
-        # Log evaluation results if available
-        if eval_results = result.context.state[:eval_results] do
-          Logger.info("Evaluation results:")
-          Logger.info("  Accuracy: #{Map.get(eval_results, :accuracy, "N/A")}")
-          Logger.info("  F1: #{Map.get(eval_results, :f1, "N/A")}")
+        if dpo_metrics = result.context.state[:dpo_metrics] do
+          Logger.info("DPO metrics:")
+          Logger.info("  Loss: #{Map.get(dpo_metrics, :loss, "N/A")}")
+          Logger.info("  Accuracy: #{Map.get(dpo_metrics, :accuracy, "N/A")}")
+          Logger.info("  Margin: #{Map.get(dpo_metrics, :margin, "N/A")}")
         end
 
-        # Log registered model if available
         if model = result.context.state[:registered_model] do
           Logger.info("Model registered: #{model.name} v#{model.version}")
-          Logger.info("  Model ID: #{model.id}")
         end
 
         :ok
 
       {:error, reason} ->
-        Logger.error("Training failed: #{inspect(reason)}")
+        Logger.error("DPO training failed: #{inspect(reason)}")
         {:error, reason}
     end
   end
@@ -229,7 +258,9 @@ defmodule TinkexCookbook.Recipes.SlBasicV2 do
       value =~ ~r/^\d+\.\d+$/ -> String.to_float(value)
       value =~ ~r/^\d+e-?\d+$/i -> String.to_float(value)
       value =~ ~r/^\d+\.\d+e-?\d+$/i -> String.to_float(value)
-      true -> value
+      value == "true" -> true
+      value == "false" -> false
+      true -> String.to_atom(value)
     end
   end
 end
