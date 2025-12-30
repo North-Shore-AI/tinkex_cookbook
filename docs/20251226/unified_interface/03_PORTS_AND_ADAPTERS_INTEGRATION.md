@@ -27,7 +27,7 @@ Define how `tinkex_cookbook` implements adapters for Crucible ports and how the 
 
 ### 3.1 TrainingClient
 
-Adapter: `TinkexCookbook.Adapters.TrainingClient.Tinkex`
+Adapter: `CrucibleKitchen.Adapters.Tinkex.TrainingClient`
 
 Responsibilities:
 - Start training session via `Tinkex.TrainingClient`.
@@ -36,7 +36,7 @@ Responsibilities:
 
 ### 3.2 DatasetStore
 
-Adapter: `TinkexCookbook.Adapters.DatasetStore.HfDatasets`
+Adapter: `CrucibleKitchen.Adapters.HfDatasets.DatasetStore`
 
 Responsibilities:
 - Load HuggingFace datasets using `HfDatasetsEx`.
@@ -45,7 +45,7 @@ Responsibilities:
 
 ### 3.3 HubClient
 
-Adapter: `TinkexCookbook.Adapters.HubClient.HfHub`
+Adapter: `CrucibleKitchen.Adapters.HfHub.HubClient`
 
 Responsibilities:
 - Model and file downloads via `HfHub`.
@@ -54,8 +54,8 @@ Responsibilities:
 ### 3.4 BlobStore
 
 Adapters:
-- `TinkexCookbook.Adapters.BlobStore.Local`
-- `TinkexCookbook.Adapters.BlobStore.S3`
+- `YourApp.Adapters.BlobStore.Local`
+- `YourApp.Adapters.BlobStore.S3`
 
 Responsibilities:
 - Save and load artifacts (checkpoints, configs, metrics).
@@ -63,7 +63,7 @@ Responsibilities:
 
 ### 3.5 EmbeddingClient
 
-Adapter: `TinkexCookbook.Adapters.EmbeddingClient.Noop` (default)
+Adapter: `CrucibleTrain.Adapters.Noop.EmbeddingClient` (default)
 
 Optional future adapters:
 - Tinker embedding API
@@ -85,10 +85,10 @@ config :tinkex_cookbook, TinkexCookbook.Runtime,
   default_manifest: "local",
   manifests: %{
     "local" => [
-      blob_store: {TinkexCookbook.Adapters.BlobStore.Local, []}
+      blob_store: {YourApp.Adapters.BlobStore.Local, []}
     ],
     "prod" => [
-      blob_store: {TinkexCookbook.Adapters.BlobStore.S3, bucket: "tinkex-prod"}
+      blob_store: {YourApp.Adapters.BlobStore.S3, bucket: "tinkex-prod"}
     ]
   }
 ```
@@ -100,10 +100,10 @@ The facade should expose a single composition root:
 ```elixir
 ports = TinkexCookbook.Ports.new(
   ports: [
-    training_client: {TinkexCookbook.Adapters.TrainingClient.Tinkex, []},
-    dataset_store: {TinkexCookbook.Adapters.DatasetStore.HfDatasets, []},
-    blob_store: {TinkexCookbook.Adapters.BlobStore.Local, []},
-    hub_client: {TinkexCookbook.Adapters.HubClient.HfHub, []}
+    training_client: {CrucibleKitchen.Adapters.Tinkex.TrainingClient, []},
+    dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []},
+    blob_store: {YourApp.Adapters.BlobStore.Local, []},
+    hub_client: {CrucibleKitchen.Adapters.HfHub.HubClient, []}
   ]
 )
 ```

@@ -218,18 +218,18 @@ defmodule TinkexCookbook.Runtime.Manifests do
   without changing recipe code.
   """
 
-  alias TinkexCookbook.Adapters
+  # Adapter module names come from crucible_kitchen or app-specific adapters.
 
   @doc "Default port implementations"
   def defaults do
     %{
-      "training_client" => Adapters.TrainingClient.Tinkex,
-      "dataset_store" => Adapters.DatasetStore.HfDatasets,
-      "blob_store" => Adapters.BlobStore.Local,
-      "hub_client" => Adapters.HubClient.HfHub,
-      "llm_client" => Adapters.LLMClient.Noop,
-      "embedding_client" => Adapters.EmbeddingClient.Noop,
-      "vector_store" => Adapters.VectorStore.Noop
+      "training_client" => CrucibleKitchen.Adapters.Tinkex.TrainingClient,
+      "dataset_store" => CrucibleKitchen.Adapters.HfDatasets.DatasetStore,
+      "blob_store" => YourApp.Adapters.BlobStore.Local,
+      "hub_client" => CrucibleKitchen.Adapters.HfHub.HubClient,
+      "llm_client" => YourApp.Adapters.LLMClient.Noop,
+      "embedding_client" => YourApp.Adapters.EmbeddingClient.Noop,
+      "vector_store" => YourApp.Adapters.VectorStore.Noop
     }
   end
 
@@ -238,26 +238,26 @@ defmodule TinkexCookbook.Runtime.Manifests do
 
   def get(:local) do
     %{
-      "blob_store" => Adapters.BlobStore.Local
+      "blob_store" => YourApp.Adapters.BlobStore.Local
     }
   end
 
   def get(:prod) do
     %{
-      "blob_store" => Adapters.BlobStore.S3,
-      "llm_client" => Adapters.LLMClient.ClaudeAgent
+      "blob_store" => YourApp.Adapters.BlobStore.S3,
+      "llm_client" => YourApp.Adapters.LLMClient.ClaudeAgent
     }
   end
 
   def get(:test) do
     %{
-      "training_client" => Adapters.TrainingClient.Noop,
-      "dataset_store" => Adapters.DatasetStore.Noop,
-      "blob_store" => Adapters.BlobStore.Noop,
-      "hub_client" => Adapters.HubClient.Noop,
-      "llm_client" => Adapters.LLMClient.Noop,
-      "embedding_client" => Adapters.EmbeddingClient.Noop,
-      "vector_store" => Adapters.VectorStore.Noop
+      "training_client" => CrucibleKitchen.Adapters.Noop.TrainingClient,
+      "dataset_store" => CrucibleKitchen.Adapters.Noop.DatasetStore,
+      "blob_store" => CrucibleKitchen.Adapters.Noop.BlobStore,
+      "hub_client" => CrucibleKitchen.Adapters.Noop.HubClient,
+      "llm_client" => YourApp.Adapters.LLMClient.Noop,
+      "embedding_client" => YourApp.Adapters.EmbeddingClient.Noop,
+      "vector_store" => YourApp.Adapters.VectorStore.Noop
     }
   end
 
@@ -274,7 +274,7 @@ end
 The critical adapter that wraps the Tinkex API:
 
 ```elixir
-defmodule TinkexCookbook.Adapters.TrainingClient.Tinkex do
+defmodule CrucibleKitchen.Adapters.Tinkex.TrainingClient do
   @moduledoc """
   TrainingClient adapter for the Tinker ML platform.
 
@@ -333,7 +333,7 @@ end
 ### DatasetStore.HfDatasets
 
 ```elixir
-defmodule TinkexCookbook.Adapters.DatasetStore.HfDatasets do
+defmodule CrucibleKitchen.Adapters.HfDatasets.DatasetStore do
   @moduledoc """
   DatasetStore adapter using HuggingFace datasets.
   """

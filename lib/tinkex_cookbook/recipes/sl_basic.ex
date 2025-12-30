@@ -21,7 +21,7 @@ defmodule TinkexCookbook.Recipes.SlBasic do
   alias CrucibleIR.Training
   alias CrucibleTrain.Renderers.TrainOnWhat
   alias CrucibleTrain.Supervised.Dataset, as: SupervisedDataset
-  alias TinkexCookbook.Adapters.TrainingClient.Tinkex, as: TinkexAdapter
+  alias CrucibleKitchen.Adapters.Tinkex.TrainingClient, as: TinkexAdapter
   alias TinkexCookbook.Datasets.NoRobots
 
   require Logger
@@ -193,7 +193,7 @@ defmodule TinkexCookbook.Recipes.SlBasic do
   # Private training implementation
   defp run_training_loop(session, config, n_train_samples) do
     # Get tokenizer for rendering
-    case TinkexAdapter.get_tokenizer(session) do
+    case TinkexAdapter.get_tokenizer([], session) do
       {:ok, tokenizer} ->
         run_with_tokenizer(session, config, tokenizer, n_train_samples)
 

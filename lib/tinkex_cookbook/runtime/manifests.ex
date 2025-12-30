@@ -6,6 +6,10 @@ defmodule TinkexCookbook.Runtime.Manifests do
   adapter implementations. This enables environment-specific behavior
   without changing recipe code.
 
+  NOTE: This module is retained for backward compatibility. Adapters
+  now live in `crucible_kitchen` (or in your application). Prefer
+  passing adapter maps directly when invoking CrucibleKitchen.
+
   ## Available Manifests
 
   - `:default` - Uses production-ready adapters
@@ -14,7 +18,8 @@ defmodule TinkexCookbook.Runtime.Manifests do
   - `:test` - All noop adapters for testing
   """
 
-  alias TinkexCookbook.Adapters
+  alias CrucibleKitchen.Adapters, as: KitchenAdapters
+  alias CrucibleTrain.Adapters, as: TrainAdapters
 
   @doc """
   Returns default port implementations.
@@ -24,13 +29,13 @@ defmodule TinkexCookbook.Runtime.Manifests do
   @spec defaults() :: map()
   def defaults do
     %{
-      "training_client" => Adapters.TrainingClient.Tinkex,
-      "dataset_store" => Adapters.DatasetStore.HfDatasets,
-      "blob_store" => Adapters.BlobStore.Local,
-      "hub_client" => Adapters.HubClient.HfHub,
-      "llm_client" => Adapters.LLMClient.Noop,
-      "embedding_client" => Adapters.EmbeddingClient.Noop,
-      "vector_store" => Adapters.VectorStore.Noop
+      "training_client" => KitchenAdapters.Tinkex.TrainingClient,
+      "dataset_store" => KitchenAdapters.HfDatasets.DatasetStore,
+      "blob_store" => KitchenAdapters.Noop.BlobStore,
+      "hub_client" => KitchenAdapters.HfHub.HubClient,
+      "llm_client" => TrainAdapters.Noop.LLMClient,
+      "embedding_client" => TrainAdapters.Noop.EmbeddingClient,
+      "vector_store" => TrainAdapters.Noop.VectorStore
     }
   end
 
@@ -40,34 +45,21 @@ defmodule TinkexCookbook.Runtime.Manifests do
   @spec get(atom()) :: map()
   def get(:default), do: %{}
 
-  def get(:local) do
-    %{
-      "blob_store" => Adapters.BlobStore.Local
-    }
-  end
+  def get(:local), do: %{}
 
-  def get(:dev) do
-    %{
-      "blob_store" => Adapters.BlobStore.Local
-    }
-  end
+  def get(:dev), do: %{}
 
-  def get(:prod) do
-    %{
-      "blob_store" => Adapters.BlobStore.S3,
-      "llm_client" => Adapters.LLMClient.ClaudeAgent
-    }
-  end
+  def get(:prod), do: %{}
 
   def get(:test) do
     %{
-      "training_client" => Adapters.TrainingClient.Noop,
-      "dataset_store" => Adapters.DatasetStore.Noop,
-      "blob_store" => Adapters.BlobStore.Noop,
-      "hub_client" => Adapters.HubClient.Noop,
-      "llm_client" => Adapters.LLMClient.Noop,
-      "embedding_client" => Adapters.EmbeddingClient.Noop,
-      "vector_store" => Adapters.VectorStore.Noop
+      "training_client" => KitchenAdapters.Noop.TrainingClient,
+      "dataset_store" => KitchenAdapters.Noop.DatasetStore,
+      "blob_store" => KitchenAdapters.Noop.BlobStore,
+      "hub_client" => KitchenAdapters.Noop.HubClient,
+      "llm_client" => TrainAdapters.Noop.LLMClient,
+      "embedding_client" => TrainAdapters.Noop.EmbeddingClient,
+      "vector_store" => TrainAdapters.Noop.VectorStore
     }
   end
 

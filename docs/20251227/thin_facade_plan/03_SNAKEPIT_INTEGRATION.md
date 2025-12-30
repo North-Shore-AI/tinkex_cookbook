@@ -562,7 +562,7 @@ Some adapters might use Snakepit:
 | `TinkexCookbook.Recipes.SlBasic` | No | Pure Elixir training |
 | `TinkexCookbook.Recipes.Gsm8kEval` | Yes | Math verification |
 | `TinkexCookbook.Python.Math` | Yes | Convenience wrapper |
-| `TinkexCookbook.Adapters.*` | Maybe | Only if needed |
+| `CrucibleKitchen.Adapters.*` | Maybe | Only if needed |
 | `crucible_train.*` | No | Pure Elixir |
 
 Python libraries are accessed **only where needed**, keeping the core system lightweight and the Python bridge isolated to specific use cases.

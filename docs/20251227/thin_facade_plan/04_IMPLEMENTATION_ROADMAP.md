@@ -146,10 +146,10 @@ mv lib/tinkex_cookbook/adapters/hub_client/hf_hub.ex \
 
 ### Step 2.1: Implement TrainingClient.Tinkex Adapter
 
-**File:** `lib/tinkex_cookbook/adapters/training_client/tinkex.ex`
+**File:** `crucible_kitchen/lib/crucible_kitchen/adapters/tinkex/training_client.ex`
 
 ```elixir
-defmodule TinkexCookbook.Adapters.TrainingClient.Tinkex do
+defmodule CrucibleKitchen.Adapters.Tinkex.TrainingClient do
   @behaviour CrucibleTrain.Ports.TrainingClient
 
   alias Tinkex.TrainingClient, as: Client
@@ -267,7 +267,7 @@ defmodule TinkexCookbook.Runtime.Manifests do
   Environment-specific port wiring manifests.
   """
 
-  alias TinkexCookbook.Adapters
+  # Adapter module names come from crucible_kitchen or app-specific adapters.
 
   def defaults do
     %{
@@ -475,7 +475,7 @@ end
 
 ### Added
 - `TinkexCookbook.Runtime` unified facade
-- `TinkexCookbook.Adapters.TrainingClient.Tinkex` adapter
+- `CrucibleKitchen.Adapters.Tinkex.TrainingClient` adapter
 - Snakepit integration for Python math libraries
 ```
 

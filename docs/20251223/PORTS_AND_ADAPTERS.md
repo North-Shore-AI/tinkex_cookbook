@@ -35,8 +35,8 @@ Adapters are resolved via `TinkexCookbook.Ports`:
 ports =
   TinkexCookbook.Ports.new(
     ports: [
-      vector_store: {TinkexCookbook.Adapters.VectorStore.Chroma, []},
-      dataset_store: {TinkexCookbook.Adapters.DatasetStore.HfDatasets, []}
+      vector_store: {YourApp.Adapters.VectorStore.Chroma, []},
+      dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []}
     ]
   )
 ```
@@ -45,8 +45,8 @@ You can also set app-level defaults:
 
 ```elixir
 config :tinkex_cookbook, TinkexCookbook.Ports,
-  vector_store: {TinkexCookbook.Adapters.VectorStore.Chroma, []},
-  dataset_store: {TinkexCookbook.Adapters.DatasetStore.HfDatasets, []}
+  vector_store: {YourApp.Adapters.VectorStore.Chroma, []},
+  dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []}
 ```
 
 ---

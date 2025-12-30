@@ -40,7 +40,7 @@ CrucibleTrain stages
 Outbound ports (CrucibleTrain.Ports.*)
         |
         v
-TinkexCookbook.Adapters.*  --->  External systems (Tinker API, HF, S3, etc)
+CrucibleKitchen.Adapters.*  --->  External systems (Tinker API, HF, S3, etc)
 ```
 
 ## 4) Composition Root
@@ -68,10 +68,10 @@ config :tinkex_cookbook, TinkexCookbook.Runtime,
   default_manifest: "local",
   manifests: %{
     "local" => [
-      blob_store: {TinkexCookbook.Adapters.BlobStore.Local, []}
+      blob_store: {YourApp.Adapters.BlobStore.Local, []}
     ],
     "prod" => [
-      blob_store: {TinkexCookbook.Adapters.BlobStore.S3, bucket: "tinkex-prod"}
+      blob_store: {YourApp.Adapters.BlobStore.S3, bucket: "tinkex-prod"}
     ]
   }
 ```
