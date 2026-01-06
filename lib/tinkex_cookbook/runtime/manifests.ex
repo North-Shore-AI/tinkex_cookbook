@@ -29,13 +29,13 @@ defmodule TinkexCookbook.Runtime.Manifests do
   @spec defaults() :: map()
   def defaults do
     %{
-      "training_client" => KitchenAdapters.Tinkex.TrainingClient,
-      "dataset_store" => KitchenAdapters.HfDatasets.DatasetStore,
-      "blob_store" => KitchenAdapters.Noop.BlobStore,
-      "hub_client" => KitchenAdapters.HfHub.HubClient,
-      "llm_client" => TrainAdapters.Noop.LLMClient,
-      "embedding_client" => TrainAdapters.Noop.EmbeddingClient,
-      "vector_store" => TrainAdapters.Noop.VectorStore
+      training_client: KitchenAdapters.Tinkex.TrainingClient,
+      dataset_store: KitchenAdapters.HfDatasets.DatasetStore,
+      blob_store: KitchenAdapters.Noop.BlobStore,
+      hub_client: KitchenAdapters.HfHub.HubClient,
+      llm_client: TrainAdapters.Noop.LLMClient,
+      embedding_client: TrainAdapters.Noop.EmbeddingClient,
+      vector_store: TrainAdapters.Noop.VectorStore
     }
   end
 
@@ -53,13 +53,13 @@ defmodule TinkexCookbook.Runtime.Manifests do
 
   def get(:test) do
     %{
-      "training_client" => KitchenAdapters.Noop.TrainingClient,
-      "dataset_store" => KitchenAdapters.Noop.DatasetStore,
-      "blob_store" => KitchenAdapters.Noop.BlobStore,
-      "hub_client" => KitchenAdapters.Noop.HubClient,
-      "llm_client" => TrainAdapters.Noop.LLMClient,
-      "embedding_client" => TrainAdapters.Noop.EmbeddingClient,
-      "vector_store" => TrainAdapters.Noop.VectorStore
+      training_client: KitchenAdapters.Noop.TrainingClient,
+      dataset_store: KitchenAdapters.Noop.DatasetStore,
+      blob_store: KitchenAdapters.Noop.BlobStore,
+      hub_client: KitchenAdapters.Noop.HubClient,
+      llm_client: TrainAdapters.Noop.LLMClient,
+      embedding_client: TrainAdapters.Noop.EmbeddingClient,
+      vector_store: TrainAdapters.Noop.VectorStore
     }
   end
 
