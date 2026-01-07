@@ -19,7 +19,6 @@ defmodule TinkexCookbook.Runtime.Manifests do
   """
 
   alias CrucibleKitchen.Adapters, as: KitchenAdapters
-  alias CrucibleTrain.Adapters, as: TrainAdapters
 
   @doc """
   Returns default port implementations.
@@ -33,9 +32,9 @@ defmodule TinkexCookbook.Runtime.Manifests do
       dataset_store: KitchenAdapters.HfDatasets.DatasetStore,
       blob_store: KitchenAdapters.Noop.BlobStore,
       hub_client: KitchenAdapters.HfHub.HubClient,
-      llm_client: TrainAdapters.Noop.LLMClient,
-      embedding_client: TrainAdapters.Noop.EmbeddingClient,
-      vector_store: TrainAdapters.Noop.VectorStore
+      llm_client: KitchenAdapters.Noop.LLMClient,
+      embedding_client: KitchenAdapters.Noop.EmbeddingClient,
+      vector_store: KitchenAdapters.Noop.VectorStore
     }
   end
 
@@ -57,9 +56,9 @@ defmodule TinkexCookbook.Runtime.Manifests do
       dataset_store: KitchenAdapters.Noop.DatasetStore,
       blob_store: KitchenAdapters.Noop.BlobStore,
       hub_client: KitchenAdapters.Noop.HubClient,
-      llm_client: TrainAdapters.Noop.LLMClient,
-      embedding_client: TrainAdapters.Noop.EmbeddingClient,
-      vector_store: TrainAdapters.Noop.VectorStore
+      llm_client: KitchenAdapters.Noop.LLMClient,
+      embedding_client: KitchenAdapters.Noop.EmbeddingClient,
+      vector_store: KitchenAdapters.Noop.VectorStore
     }
   end
 

@@ -13,6 +13,14 @@ Use this guide to stay consistent when porting the Python tinker-cookbook into E
 > **Phase 1:** Complete. See `docs/20251221/PHASE1_FOUNDATION_SLICE.md` for original scope.
 > **Phase 2:** Next. See `docs/20251221/PHASE2_LIBS_AND_HALF_RECIPES.md` for ~8 additional recipes.
 
+## Task Tracker (2026-01-06)
+
+- [x] Implementation guides for DPO/distillation/recipes/tests
+- [x] Dependency audit and integration plan
+- [x] DPO refactor (SamplingClient + forward_backward_custom)
+- [x] Distillation workflow stages + tests
+- [x] chat_sl, math_rl, distillation recipes + parity/property tests
+
 ---
 
 ## 1) ChzEx (Configuration + CLI)
@@ -200,6 +208,16 @@ The Llama3 renderer (`lib/tinkex_cookbook/renderers/llama3.ex`) implements the f
 
 {content}<|eot_id|>
 ```
+
+---
+
+## Agent Task Tracker (minimal)
+
+- [x] Phase 2: TrainingClient port updates + noop adapter tests (forward_backward_custom, loss_fn_config)
+- [ ] Phase 3: complete kitchen workflows (RL stages refactored; DPO/distillation + describe/telemetry pending)
+- [ ] Phase 4: add chat_sl, math_rl, distillation recipes + parity/property tests
+- [ ] Phase 5: eval + telemetry + MetricsStore wiring
+- [ ] Phase 6: MLOps/control plane (registry, deployment, feedback, gateway)
 
 Key callbacks:
 - `init/1` - Initialize with tokenizer

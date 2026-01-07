@@ -10,6 +10,7 @@ defmodule TinkexCookbook.MixProject do
       version: @version,
       elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
+      test_ignore_filters: [~r/^test\/support\//],
       deps: deps(),
       description: description(),
       package: package(),
@@ -74,20 +75,14 @@ defmodule TinkexCookbook.MixProject do
       # DIRECT DEPENDENCIES (not provided by crucible_kitchen)
       # ==========================================================================
 
-      # LLM agent SDKs (CLI-backed) - used directly in adapters
-      {:claude_agent_sdk, "~> 0.6.8"},
-      {:codex_sdk, "~> 0.4.2"},
-
-      # ChromaDB vector store - used directly in adapters/vector_store/chroma.ex
-      {:chroma, "~> 0.1.2"},
-
       # ==========================================================================
       # DEVELOPMENT/TEST DEPENDENCIES
       # ==========================================================================
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:mox, "~> 1.0", only: :test}
+      {:mox, "~> 1.0", only: :test},
+      {:stream_data, "~> 0.6", only: :test}
     ]
   end
 end

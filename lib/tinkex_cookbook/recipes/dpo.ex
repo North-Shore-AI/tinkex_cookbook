@@ -58,6 +58,7 @@ defmodule TinkexCookbook.Recipes.DPO do
   alias CrucibleKitchen.Adapters.HfDatasets.DatasetStore, as: HfDatasetsAdapter
   alias CrucibleKitchen.Adapters.Noop.Evaluator, as: NoopEvaluator
   alias CrucibleKitchen.Adapters.Noop.ModelRegistry, as: NoopModelRegistry
+  alias CrucibleKitchen.Adapters.Tinkex.SamplingClient, as: TinkexSamplingAdapter
   alias CrucibleKitchen.Adapters.Tinkex.TrainingClient, as: TinkexAdapter
   alias CrucibleKitchen.Workflows.Preference, as: PreferenceWorkflow
 
@@ -104,7 +105,7 @@ defmodule TinkexCookbook.Recipes.DPO do
 
   @impl true
   def required_adapters do
-    [:training_client, :dataset_store]
+    [:training_client, :sampling_client, :dataset_store]
   end
 
   @impl true
@@ -194,13 +195,14 @@ defmodule TinkexCookbook.Recipes.DPO do
     api_key = Keyword.get(opts, :api_key)
     base_url = Keyword.get(opts, :base_url)
 
-    training_opts =
+    client_opts =
       []
       |> maybe_add(:api_key, api_key)
       |> maybe_add(:base_url, base_url)
 
     %{
-      training_client: {TinkexAdapter, training_opts},
+      training_client: {TinkexAdapter, client_opts},
+      sampling_client: {TinkexSamplingAdapter, client_opts},
       dataset_store: {HfDatasetsAdapter, []},
       evaluator: {NoopEvaluator, []},
       model_registry: {NoopModelRegistry, []}
